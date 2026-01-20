@@ -203,15 +203,20 @@ def main():
     
     #vocab_path = os.path.join(model_dir, "vocab.json")
 
-    vocab_dict = build_vocabulary(train_dataset, eval_dataset, model_dir)
+    language_tokens = list(set(train_dataset['language']))
+    logging.info(f"Language tokens: {language_tokens}")
+
+    vocab_dict = build_vocabulary(
+        train_dataset, 
+        eval_dataset,
+        add_language_tokens=config.add_language_tokens, 
+        language_tokens=language_tokens,
+        output_path=model_dir
+    )
 
     logging.info(f"Size of vocabulary created: {len(vocab_dict)}.")
     logging.info(f"Items of the vocabulary: {list(vocab_dict.items())}...")
     
-    # save vocab_dict as JSON -- but this is handled by build_vocabulary
-    # with open(vocab_file, 'w') as f:
-    #     json.dump(vocab_dict, f, indent=4)
-
     
     # Create processor
     logging.info("Creating processor...")
@@ -226,24 +231,16 @@ def main():
     # Create model
     logging.info(f"Creating model from the pretraiend {config.pretrained_model} model...")
     model = create_asr_model(config, processor)
-
-    # check if distributed training is available
-    if torch.cuda.device_count() > 1:
-        logging.info(f"Using {torch.cuda.device_count()} GPUs")
-        #model._set_static_graph()
-        # Initialize distributed training
-        #torch.distributed.init_process_group(backend='nccl')
-        #local_rank = torch.distributed.get_rank()
-        #torch.cuda.set_device(local_rank)
-        #logging.info(f"Using GPU {local_rank} for training")
-        #logging.info(f"Training on {torch.cuda.get_device_name(local_rank)}")
     
     # Prepare datasets
     logging.info("Preparing datasets...")
     train_dataset, eval_dataset = prepare_datasets(
         train_dataset, eval_dataset, processor
     )
-    
+
+    # show a tokenized sample of the train dataset and deocde text
+    logging.info(f"first sample of the train dataset: {train_dataset[0]['labels']}")
+    logging.info(f"first sample of the decoded text: {processor.decode(train_dataset[0]['labels'])}")
 
     # Create data collator
     data_collator = DataCollatorCTCWithPadding(

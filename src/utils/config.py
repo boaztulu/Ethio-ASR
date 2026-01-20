@@ -45,6 +45,9 @@ class ASRConfig:
     sample: bool = False
     sample_size: int = 1000
     #chars_to_remove_regex: str = r'[\,\?\.\!\-\;\:\"\"\%\"\�\']'
+
+    # model vocab settings
+    add_language_tokens: bool = False
     character_set: str = "abcdefghijklmnopqrstuvwxyz0123456789 -'"
     apply_accent_replacements: bool = True
     

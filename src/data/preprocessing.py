@@ -71,13 +71,13 @@ def clean_text_batch(batch: Dict[str, Any],
     
     # apply cleaning to all transcriptions in the batch
     batch["clean_transcription"] = [
-        _clean_text_with_set(text, allowed_char_set, apply_accent_replacements) 
+        _clean_text_with_char_set(text, allowed_char_set, apply_accent_replacements) 
         for text in batch["transcription"]
     ]
     return batch
 
 
-def _clean_text_with_set(text, allowed_set, apply_accent_replacements=True):
+def _clean_text_with_char_set(text, allowed_set, apply_accent_replacements=True):
     """Internal function that uses pre-computed set for faster cleaning"""
     
     # apply NFC normalization
@@ -242,5 +242,9 @@ def prepare_dataset_batch(batch: Dict[str, List[Any]], processor) -> Dict[str, L
     # tokenize all texts at once
     labels = processor(text=batch["clean_transcription"]).input_ids
     batch["labels"] = labels
+
+    # show first sample of the batch
+    print(f"first sample of the batch: {batch['clean_transcription'][0]}")
+    print(f"first sample of the labels: {batch['labels'][0]}")
     
     return batch

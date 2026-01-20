@@ -115,6 +115,20 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
             "audio_duration", audio_duration_list
         )
 
+    # sample dataset if specified
+    if config.sample:
+        logging.info(f"Sampling dataset to {config.sample_size} samples...")
+
+        # shuffle the train dataset
+        train_dataset = train_dataset.shuffle(seed=config.seed)
+        # select the first config.sample_size samples
+        train_dataset = train_dataset.select(range(config.sample_size))
+
+        # shuffle the dev dataset
+        dev_dataset = dev_dataset.shuffle(seed=config.seed)
+        # select the first config.sample_size samples
+        dev_dataset = dev_dataset.select(range(config.sample_size))
+
     # same for dev dataset
     if "duration" in dev_dataset.column_names:
         dev_dataset = dev_dataset.rename_column("duration", "audio_duration")
@@ -139,18 +153,6 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
             "audio_duration", audio_duration_list
         )
 
-    # save dataset to disk
-    # NOTE: this was added only for the switchboard dataset 
-    # to save time on re-computing the audio duration
-    # logging.info(f"Saving dataset to disk...")
-    # dataset = DatasetDict({
-    #     "train": train_dataset,
-    #     "dev": dev_dataset
-    # })
-    # dataset.save_to_disk("switchboard-dataset-processed")
-    # logging.info(f"Dataset saved to disk at switchboard-dataset-processed")
-
-    
 
     # if there is a column called "audio_filepath" rename it to "audio"
     if "audio_filepath" in train_dataset.column_names:
@@ -175,7 +177,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
     # Remove features not used in training 
     logging.info(f"Removing unnecessary columns...")
     features_to_keep = [
-        "audio", "transcription", "audio_duration",
+        "audio", "transcription", "audio_duration", "language",
     ]
 
     features_to_remove = [f for f in train_dataset.features if f not in features_to_keep]
@@ -211,12 +213,6 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         desc="Removing short samples in dev split"
     )
 
-    # Sample dataset if specified
-    if config.sample:
-        logging.info(f"Sampling dataset to {config.sample_size} samples...")
-        train_dataset = train_dataset.select(range(config.sample_size))
-        #dev_dataset = dev_dataset.select(range(3989))
-
 
     # Preprocess text transcripts by removing special characters
     logging.info(f"Preprocessing text transcripts...")
@@ -232,12 +228,38 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         batch_size=64,
         desc="Cleaning text transcripts in dev split"
     )
-    
+
+    # add language tokens to the beginning of the transcription
+    if config.add_language_tokens:
+        train_dataset = train_dataset.map(
+            lambda batch: add_language_tokens_to_transcription(batch),
+            batched=True,
+            batch_size=64,
+            desc="Adding language tokens to train split"
+        )
+        dev_dataset = dev_dataset.map(
+            lambda batch: add_language_tokens_to_transcription(batch),
+            batched=True,
+            batch_size=64,
+            desc="Adding language tokens to dev split"
+        )
+
     return train_dataset, dev_dataset
+
+
+def add_language_tokens_to_transcription(batch: Dict[str, Any]) -> Dict[str, Any]:
+    """Add language tokens to the beginning of the transcription"""
+    batch["clean_transcription"] = [
+        f"[{lang.upper()}] {trans}" 
+        for lang, trans in zip(batch["language"], batch["clean_transcription"])
+    ]
+    return batch
 
 
 def build_vocabulary(train_dataset: Dataset,
                      dev_dataset: Dataset,
+                     add_language_tokens: bool = False,
+                     language_tokens: List[str] = None,
                      output_path: str = "./vocab.json") -> Dict[str, int]:
     """Build vocabulary from datasets and save it to a file.
     
@@ -276,6 +298,11 @@ def build_vocabulary(train_dataset: Dataset,
     
     vocab_dict["[UNK]"] = len(vocab_dict)
     vocab_dict["[PAD]"] = len(vocab_dict)
+
+    if add_language_tokens:
+        for token in language_tokens:
+            tok_key = f"[{token.upper()}]"
+            vocab_dict[tok_key] = len(vocab_dict)
     
     # Save vocabulary to file
     with open(f"{output_path}/vocab.json", 'w') as vocab_file:

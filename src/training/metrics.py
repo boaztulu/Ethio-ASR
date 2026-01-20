@@ -26,13 +26,20 @@ def compute_metrics(pred, processor, wer_metric, cer_metric):
     # Decode predictions and references
     pred_str = processor.batch_decode(pred_ids)
     label_str = processor.batch_decode(pred.label_ids, group_tokens=False)
+
+    # print a few predicted samples and references
+    for i in range(min(5, len(pred_str))):
+        print(f"Sample {i}:")
+        print(f"Prediction: {pred_str[i]}")
+        print(f"Reference: {label_str[i]}")
+        print("-"*75)
     
     # Compute metrics
     wer = wer_metric.compute(predictions=pred_str, references=label_str)
     cer = cer_metric.compute(predictions=pred_str, references=label_str)
 
     # combined score    
-    combined_error = (0.4 * wer) + (0.6 * cer)
+    combined_error = (0.5 * wer) + (0.5 * cer)
 
     score = (1 - combined_error) * 100
     
