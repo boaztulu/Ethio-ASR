@@ -1,0 +1,246 @@
+# src/data/preprocessing.py
+import re
+import unicodedata
+from typing import Dict, List, Any
+from datasets import Dataset
+from transformers import Wav2Vec2Processor, Wav2Vec2BertProcessor
+
+
+# Pre-compute accent replacements for better performance (mainly for Fulani)
+_ACCENT_REPLACEMENTS = {
+    "á": "a", "à": "a", "â": "a", "ä": "a", "ã": "a", "å": "a", "ā": "a",
+    "é": "e", "è": "e", "ê": "e", "ë": "e", "ē": "e",
+    "í": "i", "ì": "i", "î": "i", "ï": "i", "ī": "i",
+    "ó": "o", "ò": "o", "ô": "o", "ö": "o", "õ": "o", "ō": "o",
+    "ú": "u", "ù": "u", "û": "u", "ü": "u", "ū": "u",
+    "ç": "c",
+    "ñ": "n",
+    "ÿ": "y",
+}
+
+
+# def clean_text(text, 
+#                allowed_chars="abcdefghijklmnopqrstuvwxyz0123456789 -'", 
+#                apply_accent_replacements=True):
+#     """clean single text string
+    
+#     Args:
+#         text: Text string to clean
+#         allowed_chars: String containing all allowed characters
+#         apply_accent_replacements: Whether to apply accent replacements
+#     Returns:
+#         Cleaned and normalized text string
+#     """
+    
+#     # apply NFC normalization
+#     text = unicodedata.normalize("NFC", text)
+    
+#     # replace problematic chars with standard equivalents
+#     text = text.replace("'", "'").replace("ʼ", "'")
+
+#     # apply accent replacements using pre-computed dictionary
+#     if apply_accent_replacements:
+#         for src, tgt in _ACCENT_REPLACEMENTS.items():
+#             text = text.replace(src, tgt)
+
+#     # keep only allowed characters (convert to set for O(1) lookup)
+#     allowed_set = set(allowed_chars)
+#     text = ''.join(c for c in text if c.lower() in allowed_set)
+    
+#     # normalize whitespace
+#     text = re.sub(r'\s+', ' ', text).strip()
+    
+#     return text.lower()
+    
+
+def clean_text_batch(batch: Dict[str, Any], 
+                     allowed_chars="abcdefghijklmnopqrstuvwxyz0123456789 -'",
+                     apply_accent_replacements=True) -> Dict[str, Any]:
+    """clean text in a batch of data
+    
+    Args:
+        batch: Dictionary containing batch data with 'transcription' field
+        allowed_chars: String containing all allowed characters
+        apply_accent_replacements: Whether to apply accent replacements
+    
+    Returns:
+        Batch with cleaned transcriptions
+    """
+    # Convert to set once for the entire batch for better performance
+    allowed_char_set = set(allowed_chars)
+    
+    # apply cleaning to all transcriptions in the batch
+    batch["clean_transcription"] = [
+        _clean_text_with_set(text, allowed_char_set, apply_accent_replacements) 
+        for text in batch["transcription"]
+    ]
+    return batch
+
+
+def _clean_text_with_set(text, allowed_set, apply_accent_replacements=True):
+    """Internal function that uses pre-computed set for faster cleaning"""
+    
+    # apply NFC normalization
+    text = unicodedata.normalize("NFC", text)
+    
+    # replace problematic chars with standard equivalents
+    text = text.replace("'", "'").replace("ʼ", "'")
+
+    # apply accent replacements using pre-computed dictionary
+    if apply_accent_replacements:
+        for src, tgt in _ACCENT_REPLACEMENTS.items():
+            text = text.replace(src, tgt)
+
+    # keep only allowed characters (use pre-computed set)
+    text = ''.join(c for c in text if c.lower() in allowed_set)
+    
+    # normalize whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text.lower()
+
+
+def extract_all_chars(batch: Dict[str, List[str]]) -> Dict[str, List[Any]]:
+    """Extract unique characters from all sentences in a batch.
+    
+    Args:
+        batch: Dictionary containing batch data with 'sentence' field
+        
+    Returns:
+        Dictionary with vocabulary and text information
+    """
+    all_text = " ".join(batch["clean_transcription"])
+    vocab = list(set(all_text))
+    return {"vocab": [vocab], "all_text": [all_text]}
+
+
+# def create_vocabulary(dataset: Dataset) -> Dict[str, int]:
+#     """Create vocabulary dictionary from dataset.
+    
+#     Args:
+#         dataset: Dataset containing text to build vocabulary from
+        
+#     Returns:
+#         Dictionary mapping characters to integer indices
+#     """
+#     # Extract unique characters
+#     vocab_list = dataset["vocab"][0]
+#     vocab_dict = {v: k for k, v in enumerate(sorted(vocab_list))}
+    
+#     # Handle special tokens
+#     vocab_dict["|"] = vocab_dict[" "]
+#     del vocab_dict[" "]
+    
+#     vocab_dict["[UNK]"] = len(vocab_dict)
+#     vocab_dict["[PAD]"] = len(vocab_dict)
+    
+#     return vocab_dict
+
+
+# def prepare_dataset(batch: Dict[str, Any], processor) -> Dict[str, Any]:
+#     """Prepare dataset for training by processing audio and tokenizing text.
+    
+#     Args:
+#         batch: Dictionary containing batch data
+#         processor: 
+#             Wav2Vec2Processor or Wav2Vec2BertProcessor for audio and text processing
+        
+#     Returns:
+#         Processed batch ready for model input
+#     """
+#     # Process audio
+#     audio = batch["audio"]
+
+#     # check wheather the processor is Wav2Vec2BertProcessor
+#     if isinstance(processor, Wav2Vec2BertProcessor):
+#         batch["input_features"] = processor(
+#             audio["array"], 
+#             sampling_rate=audio["sampling_rate"]
+#         ).input_features[0]
+
+#         batch["input_length"] = len(batch["input_features"])
+
+#     # for Wav2Vec2Processor or similar processors 
+#     else:
+#         batch["input_values"] = processor(
+#             audio["array"], 
+#             sampling_rate=audio["sampling_rate"]
+#         ).input_values[0]
+
+#         batch["input_length"] = len(batch["input_values"])
+    
+#     # Process text (updated approach)
+#     batch["labels"] = processor(text=batch["clean_transcription"]).input_ids
+    
+#     return batch
+
+def prepare_dataset(batch: Dict[str, Any], processor) -> Dict[str, Any]:
+    """prepare dataset for training by processing audio and tokenizing text.
+        Args:
+        batch: Dictionary containing batch data
+        processor: 
+            Wav2Vec2Processor/Wav2Vec2BertProcessor for audio/text processing
+        
+    Returns:
+        Processed batch ready for model input
+    """
+
+    # Process audio
+    audio = batch["audio"]
+    features = processor(audio["array"], sampling_rate=audio["sampling_rate"])
+    
+    # handle both processor types in one line
+    is_w2vBERT = isinstance(processor, Wav2Vec2BertProcessor)
+
+    if is_w2vBERT: 
+        key = "input_features"
+        features = features.input_features[0]
+    else:
+        # for Wav2Vec2Processor or similar processors
+        key = "input_values"
+        features = features.input_values[0]
+    
+    batch[key] = features
+    batch["length"] = len(features)
+    batch["labels"] = processor(text=batch["clean_transcription"]).input_ids
+    
+    return batch
+
+# batch implementation
+def prepare_dataset_batch(batch: Dict[str, List[Any]], processor) -> Dict[str, List[Any]]:
+    """
+    Prepare dataset batch for training by processing audio and tokenizing text.
+    
+    Args:
+        batch: Dictionary containing batch data
+        processor: 
+            Wav2Vec2Processor/Wav2Vec2BertProcessor for audio/text processing
+        
+    Returns:
+        Processed batch ready for model input
+    """
+    # process multiple samples at once
+    audio_arrays = [audio["array"] for audio in batch["audio"]]
+    sampling_rates = [audio["sampling_rate"] for audio in batch["audio"]]
+    
+    # process all audio at once if possible
+    features = processor(audio_arrays, sampling_rate=sampling_rates[0])
+    
+    is_w2vBERT = isinstance(processor, Wav2Vec2BertProcessor)
+    if is_w2vBERT:
+        key = "input_features"
+        batch[key] = features.input_features
+    else:
+        key = "input_values"
+        batch[key] = features.input_values
+    
+    # adding a length key is important for speeding up training 
+    # because otherwisew the trainer has to compute the length 
+    # of the input features/values for each sample
+    batch["length"] = [len(f) for f in batch[key]]
+    
+    # tokenize all texts at once
+    labels = processor(text=batch["clean_transcription"]).input_ids
+    batch["labels"] = labels
+    
+    return batch
