@@ -32,7 +32,7 @@ def create_asr_model(config: ASRConfig,
             mask_time_prob=0.00,
             layerdrop=0.00,
             ctc_loss_reduction="mean",
-            #add_adapter=True,  
+            add_adapter=True,  
             pad_token_id=processor.tokenizer.pad_token_id,
             vocab_size=len(processor.tokenizer),
         )

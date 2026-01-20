@@ -48,7 +48,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
                      f"{config.dataset_path}...")
         dataset = load_dataset(
             config.dataset_path,
-            "all", # only for the Ethiopian speech corpus
+            config.language,  # only for the Ethiopian speech corpus
             verification_mode="no_checks", 
         )
 

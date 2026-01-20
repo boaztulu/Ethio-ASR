@@ -38,6 +38,7 @@ class ASRConfig:
     # Data settings
     train_split: str = "train"
     eval_split: str = "validation"
+    language: str = "all" 
     
     use_custom_dataset: bool = False
     dataset_path: Optional[str] = None
