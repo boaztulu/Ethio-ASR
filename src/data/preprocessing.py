@@ -21,7 +21,7 @@ _ACCENT_REPLACEMENTS = {
    
 
 def clean_text_batch(batch: Dict[str, Any], 
-                     allowed_chars="abcdefghijklmnopqrstuvwxyz0123456789 -'",
+                     allowed_chars=" abcdefghijklmnopqrstuvwxyz0123456789 -'",
                      apply_accent_replacements=True) -> Dict[str, Any]:
     """clean text in a batch of data
     

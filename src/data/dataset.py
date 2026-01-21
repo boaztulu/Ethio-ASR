@@ -49,20 +49,17 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
             config.language,  # only for the Ethiopian speech corpus
             verification_mode="no_checks", 
         )
-
-        # save dataset to disk
-        # logging.info(f"Saving dataset to disk...")
-        # dataset.save_to_disk("switchboard-dataset")
-        # logging.info(f"Dataset saved to disk at switchboard-dataset")
-
-    # cast audio column to Audio with 16000 Hz sampling rate
-    logging.info(f"Casting audio column to Audio with 16000 Hz sampling rate...")
-    dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
     
     # making splits
     logging.info(f"Creating train and dev splits...")
     train_dataset = dataset[config.train_split]
     dev_dataset = dataset[config.eval_split]
+
+
+    # cast audio column to Audio with 16000 Hz sampling rate
+    logging.info(f"Casting audio column to Audio with 16000 Hz sampling rate...")
+    train_dataset = train_dataset.cast_column("audio", Audio(sampling_rate=16000))
+    dev_dataset = dev_dataset.cast_column("audio", Audio(sampling_rate=16000))
 
     # if there is a feature called "transcript" rename it to "transcription"
     # if it is called "transcription" just keep it
@@ -211,7 +208,6 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         desc="Removing short samples in dev split"
     )
 
-
     # Preprocess text transcripts by removing special characters
     logging.info(f"Preprocessing text transcripts...")
     train_dataset = train_dataset.map(
@@ -229,28 +225,43 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
 
     # add language tokens to the beginning of the transcription
     if config.add_language_tokens:
+        # debug with an emoji in the print statement
+        print("Adding language tokens to train split 🤯")
+        
         train_dataset = train_dataset.map(
-            lambda batch: add_language_tokens_to_transcription(batch),
+            lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
             batch_size=64,
             desc="Adding language tokens to train split"
         )
+        print("Adding language tokens to dev split 🤯")
+
         dev_dataset = dev_dataset.map(
-            lambda batch: add_language_tokens_to_transcription(batch),
+            lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
             batch_size=64,
             desc="Adding language tokens to dev split"
         )
 
+        # show clean_transcription of the first 10 samples in the train split
+        #print(f"Clean transcription of the first 10 samples in the train split: {train_dataset['clean_transcription'][:10]}")
+
     return train_dataset, dev_dataset
 
 
-def add_language_tokens_to_transcription(batch: Dict[str, Any]) -> Dict[str, Any]:
+def add_language_tag_to_transcript(batch: Dict[str, Any]) -> Dict[str, Any]:
     """Add language tokens to the beginning of the transcription"""
+    # debug with an emoji in the print statement
+    print("Adding language tag function called :D ")
+
+    # word delimiter "|" was used instead of space after language tag
+    # tokenizer strips whitespace around special tokens like [AMHARIC],
+    # but "|" is encoded as a regular token (mapped to space in vocab)
     batch["clean_transcription"] = [
-        f"[{lang.upper()}] {trans}" 
+        f"[{lang.upper()}]|{trans}"
         for lang, trans in zip(batch["language"], batch["clean_transcription"])
     ]
+
     return batch
 
 
@@ -258,7 +269,7 @@ def build_vocabulary(character_set: set[str],
                      add_language_tags: bool = False,
                      language_tags: List[str] = None,
                      output_path: str = "./vocab.json") -> Dict[str, int]:
-    """Build vocabulary from datasets and save it to a file.
+    """Build vocabulary.
     
     Args:
         character_set: Set of characters to include in the vocabulary
