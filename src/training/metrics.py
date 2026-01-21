@@ -28,10 +28,14 @@ def compute_metrics(pred, processor, wer_metric, cer_metric):
     label_str = processor.batch_decode(pred.label_ids, group_tokens=False)
 
     # print a few predicted samples and references
-    for i in range(min(5, len(pred_str))):
+    for i in range(min(10, len(pred_str))):
         print(f"Sample {i}:")
+        sample_wer = wer_metric.compute(predictions=[pred_str[i]], references=[label_str[i]])
+        sample_cer = cer_metric.compute(predictions=[pred_str[i]], references=[label_str[i]])
         print(f"Prediction: {pred_str[i]}")
         print(f"Reference: {label_str[i]}")
+        print(f"WER: {sample_wer*100:.4f}%")
+        print(f"CER: {sample_cer*100:.4f}%")
         print("-"*75)
     
     # Compute metrics

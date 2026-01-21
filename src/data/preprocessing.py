@@ -18,40 +18,7 @@ _ACCENT_REPLACEMENTS = {
     "ÿ": "y",
 }
 
-
-# def clean_text(text, 
-#                allowed_chars="abcdefghijklmnopqrstuvwxyz0123456789 -'", 
-#                apply_accent_replacements=True):
-#     """clean single text string
-    
-#     Args:
-#         text: Text string to clean
-#         allowed_chars: String containing all allowed characters
-#         apply_accent_replacements: Whether to apply accent replacements
-#     Returns:
-#         Cleaned and normalized text string
-#     """
-    
-#     # apply NFC normalization
-#     text = unicodedata.normalize("NFC", text)
-    
-#     # replace problematic chars with standard equivalents
-#     text = text.replace("'", "'").replace("ʼ", "'")
-
-#     # apply accent replacements using pre-computed dictionary
-#     if apply_accent_replacements:
-#         for src, tgt in _ACCENT_REPLACEMENTS.items():
-#             text = text.replace(src, tgt)
-
-#     # keep only allowed characters (convert to set for O(1) lookup)
-#     allowed_set = set(allowed_chars)
-#     text = ''.join(c for c in text if c.lower() in allowed_set)
-    
-#     # normalize whitespace
-#     text = re.sub(r'\s+', ' ', text).strip()
-    
-#     return text.lower()
-    
+   
 
 def clean_text_batch(batch: Dict[str, Any], 
                      allowed_chars="abcdefghijklmnopqrstuvwxyz0123456789 -'",
@@ -113,66 +80,6 @@ def extract_all_chars(batch: Dict[str, List[str]]) -> Dict[str, List[Any]]:
     vocab = list(set(all_text))
     return {"vocab": [vocab], "all_text": [all_text]}
 
-
-# def create_vocabulary(dataset: Dataset) -> Dict[str, int]:
-#     """Create vocabulary dictionary from dataset.
-    
-#     Args:
-#         dataset: Dataset containing text to build vocabulary from
-        
-#     Returns:
-#         Dictionary mapping characters to integer indices
-#     """
-#     # Extract unique characters
-#     vocab_list = dataset["vocab"][0]
-#     vocab_dict = {v: k for k, v in enumerate(sorted(vocab_list))}
-    
-#     # Handle special tokens
-#     vocab_dict["|"] = vocab_dict[" "]
-#     del vocab_dict[" "]
-    
-#     vocab_dict["[UNK]"] = len(vocab_dict)
-#     vocab_dict["[PAD]"] = len(vocab_dict)
-    
-#     return vocab_dict
-
-
-# def prepare_dataset(batch: Dict[str, Any], processor) -> Dict[str, Any]:
-#     """Prepare dataset for training by processing audio and tokenizing text.
-    
-#     Args:
-#         batch: Dictionary containing batch data
-#         processor: 
-#             Wav2Vec2Processor or Wav2Vec2BertProcessor for audio and text processing
-        
-#     Returns:
-#         Processed batch ready for model input
-#     """
-#     # Process audio
-#     audio = batch["audio"]
-
-#     # check wheather the processor is Wav2Vec2BertProcessor
-#     if isinstance(processor, Wav2Vec2BertProcessor):
-#         batch["input_features"] = processor(
-#             audio["array"], 
-#             sampling_rate=audio["sampling_rate"]
-#         ).input_features[0]
-
-#         batch["input_length"] = len(batch["input_features"])
-
-#     # for Wav2Vec2Processor or similar processors 
-#     else:
-#         batch["input_values"] = processor(
-#             audio["array"], 
-#             sampling_rate=audio["sampling_rate"]
-#         ).input_values[0]
-
-#         batch["input_length"] = len(batch["input_values"])
-    
-#     # Process text (updated approach)
-#     batch["labels"] = processor(text=batch["clean_transcription"]).input_ids
-    
-#     return batch
 
 def prepare_dataset(batch: Dict[str, Any], processor) -> Dict[str, Any]:
     """prepare dataset for training by processing audio and tokenizing text.

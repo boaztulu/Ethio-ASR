@@ -192,33 +192,33 @@ def main():
     num_of_hours = total_num_of_sec/(60*60)
     logging.info(f"Total number of hours: {num_of_hours:.3f}!")
 
-    
     # Build vocabulary
     logging.info("Building vocabulary...")
-    
-    experiment_name = config.get_experiment_name()
 
+    # create model directory where the model and processor will be saved
+    experiment_name = config.get_experiment_name()
     model_dir = os.path.join(output_dir, experiment_name)
     os.makedirs(model_dir, exist_ok=True)
     
-    #vocab_path = os.path.join(model_dir, "vocab.json")
-
-    language_tokens = list(set(train_dataset['language']))
-    logging.info(f"Language tokens: {language_tokens}")
+    language_tags = set(train_dataset['language'])
+    logging.info(f"Language tags: {language_tags}")
 
     vocab_dict = build_vocabulary(
-        train_dataset, 
-        eval_dataset,
-        add_language_tokens=config.add_language_tokens, 
-        language_tokens=language_tokens,
-        output_path=model_dir
+        config.character_set,
+        config.add_language_tokens,
+        language_tags,
+        model_dir
     )
 
     logging.info(f"Size of vocabulary created: {len(vocab_dict)}.")
-    logging.info(f"Items of the vocabulary: {list(vocab_dict.items())}...")
+    logging.info(f"Items of the vocabulary: {vocab_dict}...")
+
+    # save vocabulary to file in JSON format
+    with open(os.path.join(model_dir, "vocab.json"), "w") as f:
+        json.dump(vocab_dict, f, indent=4)
+    logging.info(f"Vocabulary saved to {model_dir}/vocab.json")
     
-    
-    # Create processor
+    # create processor
     logging.info("Creating processor...")
     processor = create_processor(config, model_dir)
 
@@ -228,11 +228,11 @@ def main():
 
     logging.info(f"Type of the processor: {type(processor)}")   
 
-    # Create model
+    # create model
     logging.info(f"Creating model from the pretraiend {config.pretrained_model} model...")
     model = create_asr_model(config, processor)
     
-    # Prepare datasets
+    # prepare datasets
     logging.info("Preparing datasets...")
     train_dataset, eval_dataset = prepare_datasets(
         train_dataset, eval_dataset, processor
@@ -242,13 +242,13 @@ def main():
     logging.info(f"first sample of the train dataset: {train_dataset[0]['labels']}")
     logging.info(f"first sample of the decoded text: {processor.decode(train_dataset[0]['labels'])}")
 
-    # Create data collator
+    # create data collator
     data_collator = DataCollatorCTCWithPadding(
         processor=processor, 
         padding=True
     )
     
-    # Create and run trainer
+    # create and run trainer
     logging.info("Starting training model for ASR...")
     trainer = create_asr_trainer(
         model=model,
@@ -259,14 +259,11 @@ def main():
         config=config
     )
     
-    # Train model
+    # train model
     trainer.train()
     
-    # Save model
+    # save model and processor
     logging.info("Saving model and processor...")
-    #model_output_dir = output_dir / experiment_name
-    #model_output_dir.mkdir(exist_ok=True, parents=True)
-
     trainer.save_model(str(model_dir))
     processor.save_pretrained(str(model_dir))
 
@@ -282,7 +279,7 @@ def main():
     #     )
     #     logging.info(f"Pushed model to Hugging Face Hub: badrex/{experiment_name}")
     
-    # Final evaluation
+    # final evaluation
     metrics = trainer.evaluate()
     logging.info(f"Final evaluation metrics: {metrics}")
     

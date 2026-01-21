@@ -15,8 +15,6 @@ from transformers import (
 
 from src.data.preprocessing import (
     clean_text_batch, 
-    extract_all_chars, 
-    prepare_dataset, 
     prepare_dataset_batch
 )
 
@@ -256,57 +254,43 @@ def add_language_tokens_to_transcription(batch: Dict[str, Any]) -> Dict[str, Any
     return batch
 
 
-def build_vocabulary(train_dataset: Dataset,
-                     dev_dataset: Dataset,
-                     add_language_tokens: bool = False,
-                     language_tokens: List[str] = None,
+def build_vocabulary(character_set: set[str],
+                     add_language_tags: bool = False,
+                     language_tags: List[str] = None,
                      output_path: str = "./vocab.json") -> Dict[str, int]:
     """Build vocabulary from datasets and save it to a file.
     
     Args:
-        train_dataset: Training dataset
-        test_dataset: Test dataset
+        character_set: Set of characters to include in the vocabulary
+        add_language_tags: Whether to add language tags to the vocabulary
+        language_tags: List of language tags to add to the vocabulary
         output_path: Path to save vocabulary JSON file
         
     Returns:
         Vocabulary dictionary
     """
-    # Extract all characters
-    train_vocab = train_dataset.map(
-        extract_all_chars,
-        batched=True,
-        batch_size=-1,  # Process all at once for vocabulary extraction
-        keep_in_memory=True,
-        remove_columns=train_dataset.column_names
-    )
-    
-    dev_vocab = dev_dataset.map(
-        extract_all_chars,
-        batched=True,
-        batch_size=-1,  # Process all at once for vocabulary extraction
-        keep_in_memory=True,
-        remove_columns=dev_dataset.column_names
-    )
-    
-    # Combine vocabularies
-    vocab_list = list(set(train_vocab["vocab"][0]) | set(dev_vocab["vocab"][0]))
-    vocab_dict = {v: k for k, v in enumerate(sorted(vocab_list))}
-    
-    # Add special tokens
-    vocab_dict["|"] = vocab_dict[" "]
-    del vocab_dict[" "]
-    
-    vocab_dict["[UNK]"] = len(vocab_dict)
-    vocab_dict["[PAD]"] = len(vocab_dict)
+    # Create vocabulary dictionary from the user-provided character set
+    vocab_dict = {v: k for k, v in enumerate(sorted(character_set))}
 
-    if add_language_tokens:
-        for token in language_tokens:
-            tok_key = f"[{token.upper()}]"
-            vocab_dict[tok_key] = len(vocab_dict)
+    # Add special tokens
+    # add word delimiter token
+    vocab_dict["|"] = vocab_dict[" "]
+
+    # remove space token
+    del vocab_dict[" "]
+
+    # add unknown token
+    vocab_dict["[UNK]"] = len(vocab_dict)
+
+    # add padding token
+    vocab_dict["[PAD]"] = len(vocab_dict)
     
-    # Save vocabulary to file
-    with open(f"{output_path}/vocab.json", 'w') as vocab_file:
-        json.dump(vocab_dict, vocab_file,  indent=4)
+    # add language tag tokens to the vocabulary if specified
+    # this can only be applied to multilingual models
+    if add_language_tags:
+        for tag in language_tags:
+            tag_key = f"[{tag.upper()}]"
+            vocab_dict[tag_key] = len(vocab_dict)
     
     return vocab_dict
 
