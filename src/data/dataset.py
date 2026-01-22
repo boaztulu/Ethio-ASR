@@ -1,7 +1,7 @@
 # src/data/dataset.py
 import json
 import logging
-from typing import Dict, Tuple, List, Any, Optional, Union
+from typing import Dict, Tuple, List, Any, Optional
 from datasets import load_dataset, Dataset, Audio, DatasetDict
 from tqdm import tqdm
 
@@ -21,7 +21,7 @@ from src.data.preprocessing import (
 from src.utils.config import ASRConfig
 
 # type alias for processor
-ASRProcessor = Union[Wav2Vec2Processor, Wav2Vec2BertProcessor]
+ASRProcessor = Wav2Vec2Processor | Wav2Vec2BertProcessor
 
 
 def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:

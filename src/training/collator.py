@@ -56,7 +56,7 @@ class DataCollatorCTCWithPadding:
 
 
 class DataCollatorCTCAndLIDWithPadding(DataCollatorCTCWithPadding):
-    """data collator for CTC + LID multi-task training."""
+    """Data collator for CTC + LID multi-task training."""
     
     def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         """

@@ -49,8 +49,10 @@ from src.data.dataset import (
     load_datasets, 
     build_vocabulary, 
     create_processor, 
-    prepare_datasets
 )
+
+from src.data.dataset_encoders import ASRDatasetEncoder
+
 
 from src.models.factory import create_asr_model
 from src.training.collator import DataCollatorCTCWithPadding
@@ -211,11 +213,11 @@ def main():
     logging.info(f"Creating model from the pretraiend {config.pretrained_model} model...")
     model = create_asr_model(config, processor)
     
-    # prepare datasets
-    logging.info("Preparing datasets...")
-    train_dataset, eval_dataset = prepare_datasets(
-        train_dataset, eval_dataset, processor
-    )
+    # encode datasets for training with ASRDatasetEncoder
+    logging.info("Preparing datasets for training with ASRDatasetEncoder...")
+    asr_dataset_encoder = ASRDatasetEncoder(processor)
+    train_dataset = asr_dataset_encoder.encode_dataset(train_dataset)
+    eval_dataset = asr_dataset_encoder.encode_dataset(eval_dataset)
 
     # show a tokenized sample of the train dataset and deocde text
     logging.info(f"first sample of the train dataset: {train_dataset[0]['labels']}")

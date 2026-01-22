@@ -55,19 +55,4 @@ def create_asr_model(config: ASRConfig,
     if hasattr(model, 'freeze_feature_encoder') and config.freeze_feature_encoder:
         model.freeze_feature_encoder()
 
-    # # If model is based on SeamlessM4T, freeze feature encoder if specified
-    # elif hasattr(model, 'freeze_feature_extractor') and config.freeze_feature_encoder:
-    #     #model.freeze_feature_extractor()
-    #     pass
-    
     return model
-
-
-def get_device() -> torch.device:
-    """
-    Get the appropriate device for training.
-    
-    Returns:
-        torch.device for training
-    """
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
