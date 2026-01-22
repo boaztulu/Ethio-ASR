@@ -4,72 +4,73 @@ from typing import Dict, List, Union
 import torch
 from transformers import Wav2Vec2Processor, Wav2Vec2BertProcessor
 
+ASRProcessor = Union[Wav2Vec2Processor, Wav2Vec2BertProcessor]
 
-# logging for debugging
-# import logging
-# logging.basicConfig(level=logging.INFO)
-
-
-@dataclass
 class DataCollatorCTCWithPadding:
     """
     Data collator that dynamically pads inputs for CTC training.
-    
-    Args:
-        processor: Wav2Vec2Processor for processing inputs
-        padding: Padding strategy (True/False or 'longest')
     """
-    processor: Union[Wav2Vec2Processor, Wav2Vec2BertProcessor]  # Processor for audio and text
-    padding: Union[bool, str] = True
+    def __init__(self, processor: ASRProcessor, padding: Union[bool, str] = True):
+        """
+        Initialize the data collator.
+        """
+        self.processor = processor
+        self.padding = padding
+        self._is_w2vbert = isinstance(processor, Wav2Vec2BertProcessor)
+        self._input_key = "input_features" if self._is_w2vbert else "input_values"
 
-    def __call__(
-        self, 
-        features: List[Dict[str, Union[List[int], torch.Tensor]]]
-    ) -> Dict[str, torch.Tensor]:
+    def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         """
         Collate and pad a batch of examples.
-        
         Args:
-            features: List of feature dictionaries
-            
+            features: List of feature dictionaries, 
+            each dictionary contains the input features and labels
         Returns:
-            Batch dictionary with padded tensors
+            Batch dictionary with padded tensors for the input features and labels
         """
-
-        if isinstance(self.processor, Wav2Vec2BertProcessor):
-            input_key = "input_features"
-        else:
-            input_key = "input_values"
-
-
-        input_features = [
-            {input_key: feature[input_key]} for feature in features
+        # pad input features
+        input_features = [{self._input_key: f[self._input_key]} for f in features
         ]
 
-        label_features = [
-            {"input_ids": feature["labels"]} for feature in features
-        ]
-
-        # Pad inputs
         batch = self.processor.pad(
             input_features,
             padding=self.padding,
             return_tensors="pt",
         )
 
-        # Pad labels using the tokenizer, not the processor
-        tokenizer = self.processor.tokenizer
+        # get label ids and pad them
+        label_ids = [{ "input_ids": f["labels"]} for f in features]
 
-        labels_batch = tokenizer.pad(
-            label_features,
+        labels_batch = self.processor.tokenizer.pad(
+            label_ids,
             padding=self.padding,
             return_tensors="pt",
         )
-        # Replace padding with -100 to ignore loss correctly
-        labels = labels_batch["input_ids"].masked_fill(
+
+        # replace padding with -100 to ignore loss correctly
+        batch["labels"] = labels_batch["input_ids"].masked_fill(
             labels_batch.attention_mask.ne(1), -100
         )
 
-        batch["labels"] = labels
+        return batch
 
+
+class DataCollatorCTCAndLIDWithPadding(DataCollatorCTCWithPadding):
+    """data collator for CTC + LID multi-task training."""
+    
+    def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
+        """
+        Collate and pad a batch of examples for CTC + LID multi-task training.
+        Args:
+            features: List of feature dictionaries, 
+            each dictionary contains the input features and labels
+            
+        Returns:
+            Batch dictionary with padded tensors for the input features and labels
+        """
+        batch = super().__call__(features)
+        batch["lid_labels"] = torch.tensor(
+            [f["lid_labels"] for f in features],
+            dtype=torch.long,
+        )
         return batch
