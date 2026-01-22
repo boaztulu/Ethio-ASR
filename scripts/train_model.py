@@ -13,10 +13,8 @@ import torch
 import wandb
 from huggingface_hub import login as hf_login
 
-# Disable setting seeds for huggingface because it causes issues with cache access
-#from transformers import set_seed as huggingface_set_seed
 
-# A function to load environment variables from .env file
+# a function to load environment variables from .env file
 def load_env_file(env_path='.env'):
     """Load environment variables from .env file"""
     if os.path.exists(env_path):
@@ -36,16 +34,14 @@ def load_env_file(env_path='.env'):
               "Environment variables will not be loaded.")
         return False
 
-# Try to load from .env file in project root
+# try to load from .env file in project root
 script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
 project_root = script_dir.parent
 env_path = project_root / '.env'
 load_env_file(env_path)
 
-# Add project root to Python path
+# add project root to Python path
 sys.path.insert(0, str(project_root))
-
-#os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 # Local imports -- don't move these to the top 
 from src.utils.config import load_config
@@ -60,29 +56,10 @@ from src.models.factory import create_asr_model
 from src.training.collator import DataCollatorCTCWithPadding
 from src.training.trainer import create_asr_trainer
 
-# Verify HF_HOME is set and the directory exists
-# hf_home = os.environ.get('HF_HOME')
+# load huggingface set_seed function from transformers
+from transformers import set_seed as huggingface_set_seed
 
-# if hf_home:
-#     os.makedirs(hf_home, exist_ok=True)
-#     print(f"Using HF_HOME: {hf_home}")
-
-# else:
-#     print("Warning: HF_HOME not set in environment variables")
-
-#     # Set a default if not found
-#     default_hf_home = os.path.expanduser('~/.cache/huggingface')
-#     os.environ['HF_HOME'] = default_hf_home
-#     os.makedirs(default_hf_home, exist_ok=True)
-#     print(f"Setting default HF_HOME to: {default_hf_home}")
-
-
-# Add project root to Python path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(script_dir)
-sys.path.insert(0, project_root)
-
-
+# setup logging
 def setup_logging():
     """Configure logging."""
     logging.basicConfig(
@@ -91,7 +68,7 @@ def setup_logging():
         handlers=[logging.StreamHandler()]
     )
 
-
+# setup environment variables for wandb and huggingface
 def setup_environment():
     """Set up necessary environment variables."""
     # Get API keys from environment (assumes they're already set)
@@ -103,7 +80,7 @@ def setup_environment():
     if not hf_key:
         logging.warning("HF_API_KEY not found in environment variables")
 
-
+# setup random seeds in numpy, torch, and huggingface for reproducibility
 def setup_seed(seed: int):
     """Set up random seeds for reproducibility."""
     random.seed(seed)
@@ -111,7 +88,7 @@ def setup_seed(seed: int):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-        # For reproducible operations on GPU
+        # for reproducible operations on GPU
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
@@ -129,28 +106,27 @@ def parse_args():
 
 
 def main():
-    """Main training function."""
-    
-    # Setup logging and environment
+    """
+    Main function to load the config, setup the environment, 
+    parse the arguments, load the configuration, train the model, save the model and processor, 
+    evaluate the model, and clean up the dataset cache.
+    """
+    # setup logging and environment variables
     setup_logging()
     setup_environment()
     
-    # Parse arguments
+    # parse command line arguments
     args = parse_args()
     
-    # Load configuration
+    # load ASR configuration from YAML file
     logging.info(f"Loading configuration from {args.config}...")
     config = load_config(args.config)
 
-    # Setup random seed for reproducibility
+    # setup random seed for reproducibility
     setup_seed(config.seed)
+    huggingface_set_seed(config.seed)
 
-    # disabled seed for huggingface because it causes issues with cache access
-    # TODO: investigate why this is happening
-    #huggingface_set_seed(config.seed)
-
-
-    # Login to wandb
+    # login to wandb
     logging.info("Logging in to Weights & Biases...")
     if os.environ.get("WANDB_API_KEY"):
         wandb.login()
@@ -176,56 +152,59 @@ def main():
         logging.warning("HF_API_KEY not found in environment variables. "
                         "Hugging Face login will be disabled 😔")
 
-
-    # Create output directory
+    # create output directory 
     output_dir = Path(config.output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
-    
-    # Load datasets
-    logging.info(f"Loading datasets from {config.dataset_path}...")
-    train_dataset, eval_dataset = load_datasets(config)
-    logging.info(f"Loaded {len(train_dataset)} training samples "
-                 f"and {len(eval_dataset)} test samples")
 
-    # compute the size training data as hours
-    total_num_of_sec = sum([float(x) for x in train_dataset['audio_duration']])
-    num_of_hours = total_num_of_sec/(60*60)
-    logging.info(f"Total number of hours: {num_of_hours:.3f}!")
-
-    # Build vocabulary
-    logging.info("Building vocabulary...")
-
-    # create model directory where the model and processor will be saved
+    # create experiment name and model directory to save the model and processor after training
     experiment_name = config.get_experiment_name()
     model_dir = os.path.join(output_dir, experiment_name)
     os.makedirs(model_dir, exist_ok=True)
     
-    language_tags = set(train_dataset['language'])
-    logging.info(f"Language tags: {language_tags}")
+    # load datasets from the HF hub or local dataset
+    logging.info(f"Loading training and evaluation datasets from {config.dataset_path}...")
+    train_dataset, eval_dataset = load_datasets(config)
+    logging.info(f"Loaded {len(train_dataset)} training samples "
+                 f"and {len(eval_dataset)} validation samples")
+
+    # compute the size of the training data as hours
+    total_num_of_sec = sum([float(x) for x in train_dataset['audio_duration']])
+    num_of_hours = total_num_of_sec/(60*60)
+    logging.info(f"Total number of hours: {num_of_hours:.3f}!")
+
+    # build vocabulary from the training dataset
+    logging.info("Building vocabulary...")
+    
+    try:
+        language_tags = set(train_dataset['language'])
+    except KeyError: 
+        # in case no language column is found in the training dataset
+        logging.warning("Language tags not found in the training dataset. "
+                        "Multilingual model will not be used.")
+        language_tags = None
+    
+    else:
+        logging.info(f"Language tags: {language_tags}")
 
     vocab_dict = build_vocabulary(
         config.character_set,
         config.add_language_tokens,
-        language_tags,
-        model_dir
+        language_tags
     )
 
     logging.info(f"Size of vocabulary created: {len(vocab_dict)}.")
     logging.info(f"Items of the vocabulary: {vocab_dict}...")
 
-    # save vocabulary to file in JSON format
+    # save vocabulary to file in JSON format to disk
     with open(os.path.join(model_dir, "vocab.json"), "w") as f:
         json.dump(vocab_dict, f, indent=4)
     logging.info(f"Vocabulary saved to {model_dir}/vocab.json")
     
-    # create processor
+    # create processor and save it to disk
     logging.info("Creating processor...")
     processor = create_processor(config, model_dir)
-
-    # save processor to disk 
     logging.info(f"Saving processor to {model_dir}/processor/")
     processor.save_pretrained(model_dir + "/processor/")
-
     logging.info(f"Type of the processor: {type(processor)}")   
 
     # create model
@@ -280,19 +259,22 @@ def main():
     #     logging.info(f"Pushed model to Hugging Face Hub: badrex/{experiment_name}")
     
     # final evaluation
+    logging.info("Evaluating model...")
     metrics = trainer.evaluate()
     logging.info(f"Final evaluation metrics: {metrics}")
     
-    # Save metrics
+    # save metrics to file in JSON format to disk
     with open(os.path.join(model_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f)
     
-    logging.info(f"Training completed. Metrics savec to {model_dir}")
+    logging.info(f"Model evaluation completed. Metrics saved to {model_dir}/metrics.json")
 
-    # add code to delete dataset cache
+    # clean up dataset cache
     logging.info("Cleaning up dataset cache files...")
     train_dataset.cleanup_cache_files()
-    eval_dataset.cleanup_cache_files()
+    eval_dataset.cleanup_cache_files() 
+
+    logging.info("Training & evaluation completed successfully!")
 
 
 if __name__ == "__main__":

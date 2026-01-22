@@ -20,6 +20,9 @@ from src.data.preprocessing import (
 
 from src.utils.config import ASRConfig
 
+# type alias for processor
+ASRProcessor = Union[Wav2Vec2Processor, Wav2Vec2BertProcessor]
+
 
 def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
     """Load and prepare datasets for training and evaluation.
@@ -51,7 +54,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         )
     
     # making splits
-    logging.info(f"Creating train and dev splits...")
+    logging.info(f"Creating train and validations splits...")
     train_dataset = dataset[config.train_split]
     dev_dataset = dataset[config.eval_split]
 
@@ -83,7 +86,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
     elif "text" in dev_dataset.column_names:
         dev_dataset = dev_dataset.rename_column("text", "transcription")
     else:
-        raise ValueError(f"Transcription column was not found in dev dataset,"
+        raise ValueError(f"Transcription column was not found in validation dataset,"
                          f"which should be called 'transcript', 'text', or 'transcription'."
                          f"Found columns: {dev_dataset.column_names}.")
 
@@ -135,7 +138,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
 
         for audio in tqdm(dev_dataset["audio"], 
                                total=len(dev_dataset["audio"]), 
-                               desc="Calculating audio duration in dev dataset"):
+                               desc="Calculating audio duration in validation dataset"):
             
             try:
                 audio_duration_list.append(len(audio["array"]) / audio["sampling_rate"])
@@ -143,7 +146,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
                 logging.error(f"Error calculating audio duration for audio {audio}: {e}")
                 audio_duration_list.append(0.0)
 
-        logging.info(f"Creating audio_duration column in dev dataset...")
+        logging.info(f"Creating audio_duration column in validation dataset...")
         dev_dataset = dev_dataset.add_column(
             "audio_duration", audio_duration_list
         )
@@ -165,7 +168,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
     elif "audio" in dev_dataset.column_names:
         pass
     else:
-        raise ValueError(f"Audio filepath column was not found in dev dataset,"
+        raise ValueError(f"Audio filepath column was not found in validation dataset,"
                          f"which should be called 'audio_filepath' or 'audio'."
                          f"Found columns: {dev_dataset.column_names}.")
     
@@ -192,7 +195,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
     dev_dataset = dev_dataset.filter(
         lambda x: x["audio_duration"] < max_duration,
         num_proc=4,  # Use multiple CPU cores for parallel processing
-        desc="Removing long samples in dev split"
+        desc="Removing long samples in validation split"
     )
 
     # remove samples that are shorter than one second
@@ -205,7 +208,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
     dev_dataset = dev_dataset.filter(
         lambda x: x["audio_duration"] > 1.0,
         num_proc=4,  # Use multiple CPU cores for parallel processing
-        desc="Removing short samples in dev split"
+        desc="Removing short samples in validation split"
     )
 
     # Preprocess text transcripts by removing special characters
@@ -220,42 +223,33 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         lambda batch: clean_text_batch(batch, config.character_set, config.apply_accent_replacements),
         batched=True,
         batch_size=64,
-        desc="Cleaning text transcripts in dev split"
+        desc="Cleaning text transcripts in validation split"
     )
 
     # add language tokens to the beginning of the transcription
-    if config.add_language_tokens:
-        # debug with an emoji in the print statement
-        print("Adding language tokens to train split 🤯")
-        
+    if config.add_language_tokens:        
         train_dataset = train_dataset.map(
             lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
             batch_size=64,
-            desc="Adding language tokens to train split"
+            desc="Adding language tags to train transcriptions"
         )
-        print("Adding language tokens to dev split 🤯")
 
         dev_dataset = dev_dataset.map(
             lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
             batch_size=64,
-            desc="Adding language tokens to dev split"
+            desc="Adding language tags to validation transcriptions"
         )
-
-        # show clean_transcription of the first 10 samples in the train split
-        #print(f"Clean transcription of the first 10 samples in the train split: {train_dataset['clean_transcription'][:10]}")
 
     return train_dataset, dev_dataset
 
 
 def add_language_tag_to_transcript(batch: Dict[str, Any]) -> Dict[str, Any]:
-    """Add language tokens to the beginning of the transcription"""
-    # debug with an emoji in the print statement
-    print("Adding language tag function called :D ")
+    """Add language tags to the beginning of the transcription"""
 
     # word delimiter "|" was used instead of space after language tag
-    # tokenizer strips whitespace around special tokens like [AMHARIC],
+    # tokenizer strips whitespace around special tags like [AMHARIC],
     # but "|" is encoded as a regular token (mapped to space in vocab)
     batch["clean_transcription"] = [
         f"[{lang.upper()}]|{trans}"
@@ -267,33 +261,27 @@ def add_language_tag_to_transcript(batch: Dict[str, Any]) -> Dict[str, Any]:
 
 def build_vocabulary(character_set: set[str],
                      add_language_tags: bool = False,
-                     language_tags: List[str] = None,
-                     output_path: str = "./vocab.json") -> Dict[str, int]:
-    """Build vocabulary.
+                     language_tags: List[str] = None) -> Dict[str, int]:
+    """Build vocabulary from user-provided character set.
     
     Args:
         character_set: Set of characters to include in the vocabulary
-        add_language_tags: Whether to add language tags to the vocabulary
-        language_tags: List of language tags to add to the vocabulary
-        output_path: Path to save vocabulary JSON file
+        add_language_tags: Whether to add language tags to the vocabulary (only for multilingual models)
+        language_tags: List of language tags to add to the vocabulary (only for multilingual models)
         
     Returns:
         Vocabulary dictionary
     """
-    # Create vocabulary dictionary from the user-provided character set
+    # create vocabulary dictionary from the user-provided character set
     vocab_dict = {v: k for k, v in enumerate(sorted(character_set))}
 
-    # Add special tokens
-    # add word delimiter token
+    # handle special tokens
+    # add word delimiter token and remove space token
     vocab_dict["|"] = vocab_dict[" "]
-
-    # remove space token
     del vocab_dict[" "]
 
-    # add unknown token
+    # add unknown token and padding token
     vocab_dict["[UNK]"] = len(vocab_dict)
-
-    # add padding token
     vocab_dict["[PAD]"] = len(vocab_dict)
     
     # add language tag tokens to the vocabulary if specified
@@ -306,11 +294,9 @@ def build_vocabulary(character_set: set[str],
     return vocab_dict
 
 
-ASRProcessor = Union[Wav2Vec2Processor, Wav2Vec2BertProcessor]
-
 def create_processor(
         config: ASRConfig, 
-        vocab_path: str = "./vocab") -> ASRProcessor:
+        vocab_path: str) -> ASRProcessor:
     """Create a processor from tokenizer and feature extractor.
     
     Args:
@@ -319,27 +305,20 @@ def create_processor(
     Returns:
         Wav2Vec2Processor for processing audio and text
     """
-    # Initialize tokenizer
+    # initialize tokenizer
     tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(
         vocab_path,
         unk_token="[UNK]",
         pad_token="[PAD]",
         word_delimiter_token="|"
     )
-
-    # debug 
-    print("Tokenizer class:", tokenizer.__class__)
-    print("Special tokens:", tokenizer.special_tokens_map)
-    print("All tokens:", tokenizer.get_vocab().keys())
-
     
-    # Initialize feature extractor
+    # initialize feature extractor
     if config.pretrained_model == "facebook/w2v-bert-2.0":
         feature_extractor = SeamlessM4TFeatureExtractor.from_pretrained(
             "facebook/w2v-bert-2.0"
         )
-
-        # Combine into processor
+        # combine into processor
         processor = Wav2Vec2BertProcessor(
             feature_extractor=feature_extractor, 
             tokenizer=tokenizer
@@ -353,7 +332,7 @@ def create_processor(
             do_normalize=True,
             return_attention_mask=True
         )
-        # Combine into processor
+        # combine into processor
         processor = Wav2Vec2Processor(
             feature_extractor=feature_extractor,
             tokenizer=tokenizer

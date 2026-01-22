@@ -1,10 +1,13 @@
 # src/data/preprocessing.py
 import re
 import unicodedata
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 from datasets import Dataset
 from transformers import Wav2Vec2Processor, Wav2Vec2BertProcessor
 
+
+# type alias for processor
+ASRProcessor = Union[Wav2Vec2Processor, Wav2Vec2BertProcessor]
 
 # Pre-compute accent replacements for better performance (mainly for Fulani)
 _ACCENT_REPLACEMENTS = {
@@ -19,21 +22,19 @@ _ACCENT_REPLACEMENTS = {
 }
 
    
-
 def clean_text_batch(batch: Dict[str, Any], 
-                     allowed_chars=" abcdefghijklmnopqrstuvwxyz0123456789 -'",
-                     apply_accent_replacements=True) -> Dict[str, Any]:
-    """clean text in a batch of data
-    
+                     allowed_chars: str = " abcdefghijklmnopqrstuvwxyz0123456789 -'",
+                     apply_accent_replacements: bool = True) -> Dict[str, Any]:
+    """Clean text transcripts in a batch of data.    
     Args:
-        batch: Dictionary containing batch data with 'transcription' field
-        allowed_chars: String containing all allowed characters
-        apply_accent_replacements: Whether to apply accent replacements
+        batch: dictionary containing batch data with 'transcription' field
+        character_set: set of characters to keep
+        apply_accent_replacements: whether to apply accent replacements
     
     Returns:
-        Batch with cleaned transcriptions
+        dictionary containing batch data with 'clean_transcription' field
     """
-    # Convert to set once for the entire batch for better performance
+    # convert user-provided character str to set for faster cleaning
     allowed_char_set = set(allowed_chars)
     
     # apply cleaning to all transcriptions in the batch
@@ -44,10 +45,13 @@ def clean_text_batch(batch: Dict[str, Any],
     return batch
 
 
-def _clean_text_with_char_set(text, allowed_set, apply_accent_replacements=True):
-    """Internal function that uses pre-computed set for faster cleaning"""
+def _clean_text_with_char_set(text: str,
+                              character_set: set[str],
+                              apply_accent_replacements: bool = True) -> str:
+    """Internal function that uses user-provided character set for faster cleaning"""
     
-    # apply NFC normalization
+    # apply NFC normalization to ensure consistent Unicode normalization
+    # example: e + combining acute accent -> é (\u00e9)
     text = unicodedata.normalize("NFC", text)
     
     # replace problematic chars with standard equivalents
@@ -58,38 +62,24 @@ def _clean_text_with_char_set(text, allowed_set, apply_accent_replacements=True)
         for src, tgt in _ACCENT_REPLACEMENTS.items():
             text = text.replace(src, tgt)
 
-    # keep only allowed characters (use pre-computed set)
-    text = ''.join(c for c in text if c.lower() in allowed_set)
+    # keep only allowed characters using user-provided character set
+    text = ''.join(c for c in text if c.lower() in character_set)
     
-    # normalize whitespace
+    # normalize whitespace to single space
     text = re.sub(r'\s+', ' ', text).strip()
     
     return text.lower()
 
 
-def extract_all_chars(batch: Dict[str, List[str]]) -> Dict[str, List[Any]]:
-    """Extract unique characters from all sentences in a batch.
+def prepare_dataset(batch: Dict[str, Any], processor: ASRProcessor) -> Dict[str, Any]:
+    """Prepare dataset for training by processing audio and tokenizing text.
     
     Args:
-        batch: Dictionary containing batch data with 'sentence' field
-        
+        batch: dictionary containing batch data
+        processor: Wav2Vec2Processor/Wav2Vec2BertProcessor for audio/text processing
+    
     Returns:
-        Dictionary with vocabulary and text information
-    """
-    all_text = " ".join(batch["clean_transcription"])
-    vocab = list(set(all_text))
-    return {"vocab": [vocab], "all_text": [all_text]}
-
-
-def prepare_dataset(batch: Dict[str, Any], processor) -> Dict[str, Any]:
-    """prepare dataset for training by processing audio and tokenizing text.
-        Args:
-        batch: Dictionary containing batch data
-        processor: 
-            Wav2Vec2Processor/Wav2Vec2BertProcessor for audio/text processing
-        
-    Returns:
-        Processed batch ready for model input
+        dictionary containing batch data with 'input_features'/'input_values'/'length'/'labels' fields
     """
 
     # Process audio
@@ -114,17 +104,18 @@ def prepare_dataset(batch: Dict[str, Any], processor) -> Dict[str, Any]:
     return batch
 
 # batch implementation
-def prepare_dataset_batch(batch: Dict[str, List[Any]], processor) -> Dict[str, List[Any]]:
-    """
-    Prepare dataset batch for training by processing audio and tokenizing text.
+def prepare_dataset_batch(batch: Dict[str, List[Any]], processor: ASRProcessor) -> Dict[str, List[Any]]:
+    """Prepare dataset batch for training by processing audio and tokenizing text.
     
     Args:
-        batch: Dictionary containing batch data
-        processor: 
-            Wav2Vec2Processor/Wav2Vec2BertProcessor for audio/text processing
-        
+        batch: dictionary containing batch data
+        processor: Wav2Vec2Processor/Wav2Vec2BertProcessor for audio/text processing
+    
     Returns:
-        Processed batch ready for model input
+        dictionary containing batch data with the fields:
+            - 'input_features'/'input_values'
+            - 'length'
+            - 'labels'
     """
     # process multiple samples at once
     audio_arrays = [audio["array"] for audio in batch["audio"]]
@@ -133,8 +124,7 @@ def prepare_dataset_batch(batch: Dict[str, List[Any]], processor) -> Dict[str, L
     # process all audio at once if possible
     features = processor(audio_arrays, sampling_rate=sampling_rates[0])
     
-    is_w2vBERT = isinstance(processor, Wav2Vec2BertProcessor)
-    if is_w2vBERT:
+    if isinstance(processor, Wav2Vec2BertProcessor):
         key = "input_features"
         batch[key] = features.input_features
     else:
@@ -142,7 +132,7 @@ def prepare_dataset_batch(batch: Dict[str, List[Any]], processor) -> Dict[str, L
         batch[key] = features.input_values
     
     # adding a length key is important for speeding up training 
-    # because otherwisew the trainer has to compute the length 
+    # because otherwise the trainer has to compute the length 
     # of the input features/values for each sample
     batch["length"] = [len(f) for f in batch[key]]
     
@@ -150,8 +140,4 @@ def prepare_dataset_batch(batch: Dict[str, List[Any]], processor) -> Dict[str, L
     labels = processor(text=batch["clean_transcription"]).input_ids
     batch["labels"] = labels
 
-    # show first sample of the batch
-    print(f"first sample of the batch: {batch['clean_transcription'][0]}")
-    print(f"first sample of the labels: {batch['labels'][0]}")
-    
     return batch
