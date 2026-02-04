@@ -30,6 +30,14 @@ class ASRConfig:
     logging_steps: int = 10
     save_total_limit: int = 2
 
+    # new model config settings
+    # in your ASRConfig class
+    add_final_layer_adapter: bool = True
+    adapter_kernel_size: int = 3      # optional, default 3
+    adapter_stride: int = 2           # optional, default 2
+    num_adapter_layers: int = 3       # optional, default 3
+    final_dropout: float = 0.0        # optional, default 0.0
+
        
     # Step-based training settings
     max_steps: int = -1  # -1 means train for specified epochs, positive value means train for that many steps
