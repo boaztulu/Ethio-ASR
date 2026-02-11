@@ -3,6 +3,10 @@ import json
 import logging
 from typing import Dict, Tuple, List, Any, Optional
 from datasets import load_dataset, Dataset, Audio, DatasetDict
+
+from datasets import disable_caching
+disable_caching()
+
 from tqdm import tqdm
 
 from transformers import (
@@ -219,8 +223,8 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         batched=True,
         batch_size=64,
         # disable caching
-        keep_in_memory=True, 
-        load_from_cache_file=False,
+        #keep_in_memory=True, 
+        #load_from_cache_file=False,
         desc="Cleaning text transcripts in train split"
     )
     dev_dataset = dev_dataset.map(
@@ -228,8 +232,8 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         batched=True,
         batch_size=64,
         # disable caching
-        keep_in_memory=True,
-        load_from_cache_file=False,
+        #keep_in_memory=True,
+        #load_from_cache_file=False,
         desc="Cleaning text transcripts in validation split"
     )
 
@@ -240,8 +244,8 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
             batched=True,
             batch_size=64,
             # disable caching
-            keep_in_memory=True,
-            load_from_cache_file=False,
+            #keep_in_memory=True,
+            #load_from_cache_file=False,
             desc="Adding language tags to train transcriptions"
         )
 
@@ -250,8 +254,8 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
             batched=True,
             batch_size=64,
             # disable caching
-            keep_in_memory=True,
-            load_from_cache_file=False,
+            #keep_in_memory=True,
+            #load_from_cache_file=False,
             desc="Adding language tags to validation transcriptions"
         )
 
