@@ -124,8 +124,9 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
 
         # shuffle the dev dataset
         dev_dataset = dev_dataset.shuffle(seed=config.seed)
-        # select the first config.sample_size samples
-        dev_dataset = dev_dataset.select(range(config.sample_size))
+        # select the first config.sample_size samples 
+        # => changed to 2000 sampels because valdiation set is large
+        dev_dataset = dev_dataset.select(range(2000))
 
     # same for dev dataset
     if "duration" in dev_dataset.column_names:
@@ -183,33 +184,33 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
     train_dataset = train_dataset.remove_columns(features_to_remove)
     dev_dataset = dev_dataset.remove_columns(features_to_remove)
     
-    # remove samples that are longer than a max duration threshold
-    max_duration = 42.0 
-    logging.info(f"Removing samples that are longer than {max_duration} seconds...")
-    train_dataset = train_dataset.filter(
-        lambda x: x["audio_duration"] < max_duration,
-        num_proc=4,  # Use multiple CPU cores for parallel processing
-        desc="Removing long samples in train split"
-    )
+    # # remove samples that are longer than a max duration threshold
+    # max_duration = 42.0 
+    # logging.info(f"Removing samples that are longer than {max_duration} seconds...")
+    # train_dataset = train_dataset.filter(
+    #     lambda x: x["audio_duration"] < max_duration,
+    #     num_proc=4,  # Use multiple CPU cores for parallel processing
+    #     desc="Removing long samples in train split"
+    # )
 
-    dev_dataset = dev_dataset.filter(
-        lambda x: x["audio_duration"] < max_duration,
-        num_proc=4,  # Use multiple CPU cores for parallel processing
-        desc="Removing long samples in validation split"
-    )
+    # dev_dataset = dev_dataset.filter(
+    #     lambda x: x["audio_duration"] < max_duration,
+    #     num_proc=4,  # Use multiple CPU cores for parallel processing
+    #     desc="Removing long samples in validation split"
+    # )
 
-    # remove samples that are shorter than one second
-    logging.info(f"Removing samples that are shorter than one second...")
-    train_dataset = train_dataset.filter(
-        lambda x: x["audio_duration"] > 1.0,
-        num_proc=4,  # Use multiple CPU cores for parallel processing
-        desc="Removing short samples in train split"
-    )
-    dev_dataset = dev_dataset.filter(
-        lambda x: x["audio_duration"] > 1.0,
-        num_proc=4,  # Use multiple CPU cores for parallel processing
-        desc="Removing short samples in validation split"
-    )
+    # # remove samples that are shorter than one second
+    # logging.info(f"Removing samples that are shorter than one second...")
+    # train_dataset = train_dataset.filter(
+    #     lambda x: x["audio_duration"] > 1.0,
+    #     num_proc=4,  # Use multiple CPU cores for parallel processing
+    #     desc="Removing short samples in train split"
+    # )
+    # dev_dataset = dev_dataset.filter(
+    #     lambda x: x["audio_duration"] > 1.0,
+    #     num_proc=4,  # Use multiple CPU cores for parallel processing
+    #     desc="Removing short samples in validation split"
+    # )
 
     # Preprocess text transcripts by removing special characters
     logging.info(f"Preprocessing text transcripts...")
@@ -217,12 +218,18 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         lambda batch: clean_text_batch(batch, config.character_set, config.apply_accent_replacements),
         batched=True,
         batch_size=64,
+        # disable caching
+        keep_in_memory=True, 
+        load_from_cache_file=False,
         desc="Cleaning text transcripts in train split"
     )
     dev_dataset = dev_dataset.map(
         lambda batch: clean_text_batch(batch, config.character_set, config.apply_accent_replacements),
         batched=True,
         batch_size=64,
+        # disable caching
+        keep_in_memory=True,
+        load_from_cache_file=False,
         desc="Cleaning text transcripts in validation split"
     )
 
@@ -232,6 +239,9 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
             lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
             batch_size=64,
+            # disable caching
+            keep_in_memory=True,
+            load_from_cache_file=False,
             desc="Adding language tags to train transcriptions"
         )
 
@@ -239,6 +249,9 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
             lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
             batch_size=64,
+            # disable caching
+            keep_in_memory=True,
+            load_from_cache_file=False,
             desc="Adding language tags to validation transcriptions"
         )
 
