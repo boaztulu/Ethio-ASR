@@ -1,12 +1,8 @@
-# src/data/dataset.py
+# src/data/dataset_encoders.py
 from typing import Dict, Tuple, List, Any, Optional
-from datasets import load_dataset, Dataset, Audio, DatasetDict
-from tqdm import tqdm
+from datasets import Dataset
 
 from transformers import (
-    Wav2Vec2CTCTokenizer, 
-    Wav2Vec2FeatureExtractor, 
-    SeamlessM4TFeatureExtractor,
     Wav2Vec2BertProcessor,
     Wav2Vec2Processor
 )
@@ -37,7 +33,7 @@ class DatasetEncoder(ABC):
         pass
     
     @abstractmethod
-    def batch(self, batch: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+    def batch_encode(self, batch: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         """Encode a batch of samples."""
         pass
 
@@ -49,11 +45,15 @@ class DatasetEncoder(ABC):
         remove_columns: bool = True,
     ) -> Dataset:
         """Encode a dataset and prepare it for training."""
+
+        # self.batch_encode is implemented in the child classes
         return dataset.map(
-            self.batch if batched else self.__call__,
+            self.batch_encode,
             batched=batched,
             batch_size=batch_size,
+            num_proc=8,
             remove_columns=dataset.column_names if remove_columns else None,
+            desc="Encoding dataset using ASRDatasetEncoder"
         )
 
 
@@ -64,24 +64,42 @@ class ASRDatasetEncoder(DatasetEncoder):
         super().__init__(processor)
         self.text_column = text_column
     
-    def __call__(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        audio = batch["audio"]
+    def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
+        """Encode a single sample."""
+        audio = sample["audio"]
         features = self.processor(audio["array"], sampling_rate=audio["sampling_rate"])
         
-        batch[self._feature_key] = self._extract_features(features)[0]
-        batch["length"] = len(batch[self._feature_key])
-        batch["labels"] = self.processor(text=batch[self.text_column]).input_ids
+        sample[self._feature_key] = self._extract_features(features)[0]
+        sample["length"] = len(sample[self._feature_key])
+        sample["labels"] = self.processor(text=sample[self.text_column]).input_ids
         
-        return batch
+        return sample
     
-    def batch(self, batch: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+    def batch_encode(self, batch: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         audio_arrays = [audio["array"] for audio in batch["audio"]]
+
+        # IMPORTANT: this assumes that all audio samples 
+        # have the same sampling rate. Make sure to check this
         sampling_rate = batch["audio"][0]["sampling_rate"]
         
         features = self.processor(audio_arrays, sampling_rate=sampling_rate)
         
         batch[self._feature_key] = self._extract_features(features)
         batch["length"] = [len(f) for f in batch[self._feature_key]]
+
+        # # 🔍 DEBUG HERE
+        # texts = batch[self.text_column]
+        # print("TEXT COL TYPE:", type(texts), "LEN:", len(texts))
+        # print("FIRST ITEM TYPE:", type(texts[0]))
+        # print("FIRST ITEM VALUE:", texts[0])
+
+        # texts = batch[self.text_column]
+
+        # print("texts: ", texts)
+
+        # if len(texts) > 0 and isinstance(texts[0], list):
+        #     texts = [" ".join(toks) for toks in texts]
+
         batch["labels"] = self.processor(text=batch[self.text_column]).input_ids
         
         return batch
@@ -107,8 +125,8 @@ class ASRAndLIDDatasetEncoder(ASRDatasetEncoder):
         batch["lid_labels"] = self.lang2id[batch[self.language_column]]
         return batch
     
-    def batch(self, batch: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
+    def batch_encode(self, batch: Dict[str, List[Any]]) -> Dict[str, List[Any]]:
         """Encode a batch of samples."""
-        batch = super().batch(batch)
+        batch = super().batch_encode(batch)
         batch["lid_labels"] = [self.lang2id[lang] for lang in batch[self.language_column]]
         return batch

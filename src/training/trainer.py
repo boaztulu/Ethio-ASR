@@ -6,7 +6,7 @@ from transformers import Trainer, TrainingArguments, Wav2Vec2Processor
 import evaluate
 
 from src.utils.config import ASRConfig
-from src.training.metrics import compute_metrics
+from src.training.metrics import compute_metrics, preprocess_logits_for_metrics
 
 
 def create_training_args(config: ASRConfig, experiment_name: str) -> TrainingArguments:
@@ -38,11 +38,13 @@ def create_training_args(config: ASRConfig, experiment_name: str) -> TrainingArg
         output_dir=output_dir,
         group_by_length=True, # important for efficient training
         per_device_train_batch_size=config.batch_size,
+        per_device_eval_batch_size=config.batch_size,
+        #eval_accumulation_steps=1024,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
-        dataloader_num_workers=4,  # increase for multi-GPU
+        dataloader_num_workers=4,  
         ddp_find_unused_parameters=True, # this is the key parameter for distributed training
         #ddp_backend="nccl",
-        fp16=True,  # Enable mixed precision
+        fp16=False,  # Enable mixed precision
         #dataloader_pin_memory=False,
         eval_strategy="steps",
         num_train_epochs=num_train_epochs,  # always a number, never None

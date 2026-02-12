@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# scripts/train.py
+# scripts/train_model.py
 
 import os
 import sys
@@ -13,6 +13,18 @@ import torch
 import wandb
 from huggingface_hub import login as hf_login
 
+# setup logging
+def setup_logging():
+    """Configure logging."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
+
+
+# setup logging and environment variables
+setup_logging()
 
 # a function to load environment variables from .env file
 def load_env_file(env_path='.env'):
@@ -28,20 +40,24 @@ def load_env_file(env_path='.env'):
                     except ValueError:
                         # Skip lines that don't have the format KEY=VALUE
                         continue
+        logging.info(f"Environment variables loaded from {env_path}.")
         return True
     else:
-        print(f"Warning: .env file not found at {env_path}. "
+        logging.warning(f"Warning: .env file not found at {env_path}. "
               "Environment variables will not be loaded.")
         return False
 
 # try to load from .env file in project root
+logging.info("Trying to load environment variables from .env file...")
 script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
 project_root = script_dir.parent
 env_path = project_root / '.env'
 load_env_file(env_path)
+logging.info(f"Environment variables loaded from {env_path}.")
 
 # add project root to Python path
 sys.path.insert(0, str(project_root))
+logging.info(f"Project root added to Python path: {project_root}")
 
 # Local imports -- don't move these to the top 
 from src.utils.config import load_config
@@ -51,9 +67,8 @@ from src.data.dataset import (
     create_processor, 
 )
 
+from src.utils.cache import load_encoded_datasets, save_encoded_datasets
 from src.data.dataset_encoders import ASRDatasetEncoder
-
-
 from src.models.factory import create_asr_model
 from src.training.collator import DataCollatorCTCWithPadding
 from src.training.trainer import create_asr_trainer
@@ -61,14 +76,6 @@ from src.training.trainer import create_asr_trainer
 # load huggingface set_seed function from transformers
 from transformers import set_seed as huggingface_set_seed
 
-# setup logging
-def setup_logging():
-    """Configure logging."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler()]
-    )
 
 # setup environment variables for wandb and huggingface
 def setup_environment():
@@ -174,7 +181,7 @@ def main():
     num_of_hours = total_num_of_sec/(60*60)
     logging.info(f"Total number of hours: {num_of_hours:.3f}!")
 
-    # build vocabulary from the training dataset
+    # build vocabulary from  user provided character set
     logging.info("Building vocabulary...")
     
     try:
@@ -182,7 +189,7 @@ def main():
     except KeyError: 
         # in case no language column is found in the training dataset
         logging.warning("Language tags not found in the training dataset. "
-                        "Multilingual model will not be used.")
+                        "Multilingual training with language tags will not be used.")
         language_tags = None
     
     else:
@@ -197,27 +204,51 @@ def main():
     logging.info(f"Size of vocabulary created: {len(vocab_dict)}.")
     logging.info(f"Items of the vocabulary: {vocab_dict}...")
 
-    # save vocabulary to file in JSON format to disk
-    with open(os.path.join(model_dir, "vocab.json"), "w") as f:
+    # save vocabulary to dedicated CTC tokenizer directory
+    ctc_dir = os.path.join(model_dir, "ctc_tokenizer")
+    os.makedirs(ctc_dir, exist_ok=True)
+
+    with open(os.path.join(ctc_dir, "vocab.json"), "w") as f:
         json.dump(vocab_dict, f, indent=4)
-    logging.info(f"Vocabulary saved to {model_dir}/vocab.json")
+
+    logging.info(f"Vocabulary saved to {ctc_dir}/vocab.json")
+
     
     # create processor and save it to disk
     logging.info("Creating processor...")
-    processor = create_processor(config, model_dir)
+    processor = create_processor(config, ctc_dir)
+
     logging.info(f"Saving processor to {model_dir}/processor/")
-    processor.save_pretrained(model_dir + "/processor/")
+    processor.save_pretrained(os.path.join(model_dir, "processor"))
     logging.info(f"Type of the processor: {type(processor)}")   
 
     # create model
     logging.info(f"Creating model from the pretraiend {config.pretrained_model} model...")
     model = create_asr_model(config, processor)
+
+
+    print(f"pad_token_id: {processor.tokenizer.pad_token_id}")
+    print(f"vocab_size: {len(processor.tokenizer)}")
+    print(f"model blank_id: {model.config.pad_token_id}")
     
     # encode datasets for training with ASRDatasetEncoder
     logging.info("Preparing datasets for training with ASRDatasetEncoder...")
     asr_dataset_encoder = ASRDatasetEncoder(processor)
     train_dataset = asr_dataset_encoder.encode_dataset(train_dataset)
     eval_dataset = asr_dataset_encoder.encode_dataset(eval_dataset)
+
+    # # encode datasets (with caching)
+    # cache_dir = project_root / ".dataset_cache"
+    # cached_train, cached_eval = load_encoded_datasets(config, cache_dir)
+    
+    # if cached_train is not None:
+    #     train_dataset, eval_dataset = cached_train, cached_eval
+    # else:
+    #     logging.info("Preparing datasets for training with ASRDatasetEncoder...")
+    #     asr_dataset_encoder = ASRDatasetEncoder(processor)
+    #     train_dataset = asr_dataset_encoder.encode_dataset(train_dataset)
+    #     eval_dataset = asr_dataset_encoder.encode_dataset(eval_dataset)
+    #     save_encoded_datasets(train_dataset, eval_dataset, config, cache_dir)
 
     # show a tokenized sample of the train dataset and deocde text
     logging.info(f"first sample of the train dataset: {train_dataset[0]['labels']}")
@@ -228,6 +259,12 @@ def main():
         processor=processor, 
         padding=True
     )
+
+    # check label values
+    logging.info("Checking label values...")
+    for i in range(10):
+        labels = train_dataset[i]['labels']
+        print(f"Sample {i}: max={max(labels)}, min={min(labels)}, len={len(labels)}")
     
     # create and run trainer
     logging.info("Starting training model for ASR...")

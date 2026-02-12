@@ -53,7 +53,6 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
                      f"{config.dataset_path}...")
         dataset = load_dataset(
             config.dataset_path,
-            config.language,  # only for the Ethiopian speech corpus
             verification_mode="no_checks", 
         )
     
@@ -225,6 +224,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         # disable caching
         #keep_in_memory=True, 
         #load_from_cache_file=False,
+        num_proc=8,
         desc="Cleaning text transcripts in train split"
     )
     dev_dataset = dev_dataset.map(
@@ -234,6 +234,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         # disable caching
         #keep_in_memory=True,
         #load_from_cache_file=False,
+        num_proc=8,
         desc="Cleaning text transcripts in validation split"
     )
 
@@ -242,20 +243,22 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         train_dataset = train_dataset.map(
             lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
-            batch_size=64,
+            batch_size=16,
             # disable caching
             #keep_in_memory=True,
             #load_from_cache_file=False,
+            num_proc=8,
             desc="Adding language tags to train transcriptions"
         )
 
         dev_dataset = dev_dataset.map(
             lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
-            batch_size=64,
+            batch_size=16,
             # disable caching
             #keep_in_memory=True,
             #load_from_cache_file=False,
+            num_proc=8,
             desc="Adding language tags to validation transcriptions"
         )
 
@@ -295,36 +298,39 @@ def build_vocabulary(character_set: set[str],
     # handle special tokens
     # add word delimiter token and remove space token
     vocab_dict["|"] = vocab_dict[" "]
+    print("printing vocab_dict length: ", len(vocab_dict))
     del vocab_dict[" "]
 
     # add unknown token and padding token
-    vocab_dict["[UNK]"] = len(vocab_dict)
-    vocab_dict["[PAD]"] = len(vocab_dict)
+    # find next available index
+    next_idx = max(vocab_dict.values()) + 1
+
+    vocab_dict["[UNK]"] = next_idx
+    vocab_dict["[PAD]"] = next_idx + 1
     
-    # add language tag tokens to the vocabulary if specified
-    # this can only be applied to multilingual models
     if add_language_tags:
-        for tag in language_tags:
+        for i, tag in enumerate(language_tags):
             tag_key = f"[{tag.upper()}]"
-            vocab_dict[tag_key] = len(vocab_dict)
+            vocab_dict[tag_key] = next_idx + 2 + i
     
     return vocab_dict
 
 
 def create_processor(
         config: ASRConfig, 
-        vocab_path: str) -> ASRProcessor:
+        ctc_dir: str) -> ASRProcessor:
     """Create a processor from tokenizer and feature extractor.
     
     Args:
-        vocab_path: Path to directory containing vocabulary file
+        config: ASR configuration object
+        ctc_dir: Path to directory containing CTC tokenizer
         
     Returns:
         Wav2Vec2Processor for processing audio and text
     """
     # initialize tokenizer
     tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(
-        vocab_path,
+        ctc_dir,
         unk_token="[UNK]",
         pad_token="[PAD]",
         word_delimiter_token="|"

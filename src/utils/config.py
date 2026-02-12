@@ -31,12 +31,12 @@ class ASRConfig:
     save_total_limit: int = 2
 
     # new model config settings
-    # in your ASRConfig class
     add_final_layer_adapter: bool = True
-    adapter_kernel_size: int = 3      # optional, default 3
-    adapter_stride: int = 2           # optional, default 2
-    num_adapter_layers: int = 3       # optional, default 3
-    final_dropout: float = 0.0        # optional, default 0.0
+    # adapter_kernel_size: int = 3      # optional, default 3
+    # adapter_stride: int = 2           # optional, default 2
+    # num_adapter_layers: int = 3       # optional, default 3
+    # final_dropout: float = 0.0        # optional, default 0.0
+    ctc_zero_infinity: bool = True
 
        
     # Step-based training settings
