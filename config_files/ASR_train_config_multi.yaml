@@ -18,7 +18,7 @@ batch_size: 8
 gradient_accumulation_steps: 4
 num_epochs: 25
 max_steps: 18400
-learning_rate: 0.00003 # or 0.0005 for "facebook/mms-300m"  
+learning_rate: 0.00005 # or 0.0005 for "facebook/mms-300m"  
 warmup_ratio: 0.1
 fp16: true
 gradient_checkpointing: true
@@ -44,7 +44,7 @@ sample_size: 197634
 
 ## Text preprocessing settings
 # Character set allowed in transcriptions - customize based on language and script
-add_language_tokens: true
+add_language_tokens: false
 apply_accent_replacements: true
 character_set: " !#$%&'*+,-.0123456789=?@abcdefghijklmnopqrstuvwxyzሀሁሂሃሄህሆሇለሉሊላሌልሎሏሐሑሒሓሔሕሖሗመሙሚማሜምሞሟሠሡሢሣሤሥሦሧረሩሪራሬርሮሯሰሱሲሳሴስሶሷሸሹሺሻሼሽሾሿቀቁቂቃቄቅቆቇቈቊቋቌቍቐቑቒቓቔቕቖቘቚቛቜቝበቡቢባቤብቦቧቨቩቪቫቬቭቮቯተቱቲታቴትቶቷቸቹቺቻቼችቾቿኀኁኂኃኄኅኆኇኈኊኋኌኍነኑኒናኔንኖኗኘኙኚኛኜኝኞኟአኡኢኣኤእኦኧከኩኪካኬክኮኯኰኲኳኴኵኸኹኺኻኼኽኾዀዂዃዄዅወዉዊዋዌውዎዏዐዑዒዓዔዕዖዘዙዚዛዜዝዞዟዠዡዢዣዤዥዦዧየዩዪያዬይዮዯደዱዲዳዴድዶዷዸዹዺዻዼዽዾዿጀጁጂጃጄጅጆጇገጉጊጋጌግጎጏጐጒጓጔጕጘጙጚጛጜጝጞጟጠጡጢጣጤጥጦጧጨጩጪጫጬጭጮጯጰጱጲጳጴጵጶጷጸጹጺጻጼጽጾጿፀፁፂፃፄፅፆፇፈፉፊፋፌፍፎፏፐፑፒፓፔፕፖፗፘፙፚ፠፡።፣፤፥፦፧፨፩፪፫፬፭፮፯፰፱፲፳፴፵፶፷፸፹፺፻፼€"
 

@@ -17,7 +17,7 @@ from scripts.evaluate_finetuned_model_mutlilingual import process_text
 
 lang2code = {
     "afaan_oromo": "orm_Latn",
-    "wolaytta": "wol_Latn",
+    "wolaytta": "wal_Latn",
     "amharic": "amh_Ethi",
     "tigrinya": "tir_Ethi",
     "sidama": "sid_Latn",
@@ -27,7 +27,7 @@ transcript_dir = "transcripts/omni_asr"
 ds = load_dataset("badrex/ethiopian-speech-flat", "all")
 ds = ds["validation"]
 
-lang = "sidama"
+lang = "wolaytta"
 
 
 ds = ds.filter(lambda x: x["language"] == lang, num_proc=8)
