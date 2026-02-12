@@ -41,7 +41,7 @@ def create_training_args(config: ASRConfig, experiment_name: str) -> TrainingArg
         per_device_eval_batch_size=config.batch_size,
         #eval_accumulation_steps=1024,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
-        dataloader_num_workers=4,  
+        dataloader_num_workers=4, 
         ddp_find_unused_parameters=True, # this is the key parameter for distributed training
         #ddp_backend="nccl",
         fp16=False,  # Enable mixed precision
