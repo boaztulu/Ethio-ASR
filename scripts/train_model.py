@@ -255,12 +255,6 @@ def main():
         padding=True
     )
 
-    # check label values
-    logging.info("Checking label values...")
-    for i in range(10):
-        labels = train_dataset[i]['labels']
-        print(f"Sample {i}: max={max(labels)}, min={min(labels)}, len={len(labels)}")
-    
     # create and run trainer
     logging.info("Creating a Trainer object...")
     trainer = create_asr_trainer(

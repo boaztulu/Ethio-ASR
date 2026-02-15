@@ -7,6 +7,10 @@ from datasets import load_dataset, Dataset, Audio, DatasetDict
 from datasets import disable_caching
 disable_caching()
 
+# for vectorized filtering on large datasets via Arrow
+import pyarrow.compute as pc
+
+
 from tqdm import tqdm
 
 from transformers import (
@@ -26,6 +30,53 @@ from src.utils.config import ASRConfig
 
 # type alias for processor
 ASRProcessor = Wav2Vec2Processor | Wav2Vec2BertProcessor
+
+
+def _ensure_audio_duration_column(dataset: Dataset, split_name: str) -> Dataset:
+    """
+    Ensure dataset has an 'audio_duration' column, 
+    renaming from 'duration' if present or computing if missing.
+    """
+    if "audio_duration" in dataset.column_names:
+        return dataset
+    if "duration" in dataset.column_names:
+        return dataset.rename_column("duration", "audio_duration")
+
+    # otherwise, compute audio duration column
+    audio_duration_list = []
+    for audio in tqdm(
+        dataset["audio"],
+        total=len(dataset["audio"]),
+        desc=f"Calculating audio duration in {split_name} split",
+    ):
+        try:
+            audio_duration_list.append(len(audio["array"]) / audio["sampling_rate"])
+        except Exception as e:
+            logging.error(f"Error calculating audio duration for audio {audio}: {e}")
+            audio_duration_list.append(0.0)
+    logging.info(f"Creating audio_duration column in {split_name} split...")
+
+    return dataset.add_column("audio_duration", audio_duration_list)
+
+
+def _ensure_transcription_column(dataset: Dataset, split_name: str) -> Dataset:
+    """
+    Ensure dataset has a 'transcription' column, 
+    renaming from 'transcript' or 'text' if present.
+    """
+    if "transcription" in dataset.column_names:
+        return dataset
+    if "transcript" in dataset.column_names:
+        return dataset.rename_column("transcript", "transcription")
+    if "text" in dataset.column_names:
+        return dataset.rename_column("text", "transcription")
+    
+    # if no transcription column is found, raise an error
+    raise ValueError(
+        f"Transcription column was not found in {split_name} split, "
+        f"which should be called 'transcript', 'text', or 'transcription'. "
+        f"Found columns: {dataset.column_names}."
+    )
 
 
 def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
@@ -55,66 +106,51 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
             config.dataset_path,
             verification_mode="no_checks", 
         )
-    
-    # making splits
-    logging.info(f"Creating train and validations splits...")
-    train_dataset = dataset[config.train_split]
-    dev_dataset = dataset[config.eval_split]
-
 
     # cast audio column to Audio with 16000 Hz sampling rate
     logging.info(f"Casting audio column to Audio with 16000 Hz sampling rate...")
-    train_dataset = train_dataset.cast_column("audio", Audio(sampling_rate=16000))
-    dev_dataset = dev_dataset.cast_column("audio", Audio(sampling_rate=16000))
+    dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
 
-    # if there is a feature called "transcript" rename it to "transcription"
-    # if it is called "transcription" just keep it
-    if "transcription" in train_dataset.column_names:
-        pass
-    elif "transcript" in train_dataset.column_names:
-        train_dataset = train_dataset.rename_column("transcript", "transcription")
-    # else if it is "text" rename it to "transcription"
-    elif "text" in train_dataset.column_names:
-        train_dataset = train_dataset.rename_column("text", "transcription")    
-    else:
-        raise ValueError(f"Transcription column was not found in train dataset,"
-                         f"which should be called 'transcript', 'text', or 'transcription'."
-                         f"Found columns: {train_dataset.column_names}.")
-    
-    # same for dev dataset
-    if "transcription" in dev_dataset.column_names:
-        pass
-    elif "transcript" in dev_dataset.column_names:
-        dev_dataset = dev_dataset.rename_column("transcript", "transcription")
-    elif "text" in dev_dataset.column_names:
-        dev_dataset = dev_dataset.rename_column("text", "transcription")
-    else:
-        raise ValueError(f"Transcription column was not found in validation dataset,"
-                         f"which should be called 'transcript', 'text', or 'transcription'."
-                         f"Found columns: {dev_dataset.column_names}.")
+    logging.info(f"Creating train and validation splits...")
+    # if language is not "all", filter dataset to only include language
+    if config.language != "all":
+        languages = dataset[config.train_split].unique("language")
+        if config.language not in languages:
+            raise ValueError(f"Language {config.language} not found in dataset")
+        
+        logging.info(f"Filtering dataset for {config.language.upper()} language...")
+
+        # table = dataset[config.train_split].data.table
+        # mask = pc.equal(table.column("language"), config.language)
+        # filtered_table = table.filter(mask)
+        # train_dataset = Dataset(filtered_table)
+
+        train_dataset = dataset[config.train_split].filter(
+            lambda x: x["language"] == config.language,
+            batch_size=32,
+            desc="Filtering train split"
+        )
+
+        # table = dataset[config.eval_split].data.table
+        # mask = pc.equal(table.column("language"), config.language)
+        # filtered_table = table.filter(mask)
+        # dev_dataset = Dataset(filtered_table)
+
+        dev_dataset = dataset[config.eval_split].filter(
+            lambda x: x["language"] == config.language,
+            batch_size=32,
+            desc="Filtering validation split"
+        )
+    else: # all languages => multilingual model
+        train_dataset = dataset[config.train_split]
+        dev_dataset = dataset[config.eval_split]
+
+    train_dataset = _ensure_transcription_column(train_dataset, "train")
+    dev_dataset = _ensure_transcription_column(dev_dataset, "validation")
 
     # if there is a column called "duration" rename it to "audio_duration"
-    if "duration" in train_dataset.column_names:
-        train_dataset = train_dataset.rename_column("duration", "audio_duration")
-    elif "audio_duration" in train_dataset.column_names:
-        pass
-    else:
-        # create audio_duration column
-        audio_duration_list = []
-
-        for audio in tqdm(train_dataset["audio"], 
-                               total=len(train_dataset["audio"]),  # Use multiple CPU cores for parallel processing
-                               desc="Calculating audio duration in train dataset"):
-            try:
-                audio_duration_list.append(len(audio["array"]) / audio["sampling_rate"])
-            except Exception as e:
-                logging.error(f"Error calculating audio duration for audio {audio}: {e}")
-                audio_duration_list.append(0.0)
-
-        logging.info(f"Creating audio_duration column in train dataset...")
-        train_dataset = train_dataset.add_column(
-            "audio_duration", audio_duration_list
-        )
+    train_dataset = _ensure_audio_duration_column(train_dataset, "train")
+    dev_dataset = _ensure_audio_duration_column(dev_dataset, "validation")
 
     # sample dataset if specified
     if config.sample:
@@ -122,13 +158,11 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
 
         # shuffle the train dataset
         train_dataset = train_dataset.shuffle(seed=config.seed)
-        # select the first config.sample_size samples
         train_dataset = train_dataset.select(range(config.sample_size))
 
         # shuffle the dev dataset
         dev_dataset = dev_dataset.shuffle(seed=config.seed)
-        # select the first config.sample_size samples 
-        # => changed to 2000 sampels because valdiation set is large
+        # => sample 2000 sampels because valdiation set is large
         dev_dataset = dev_dataset.select(range(2000))
 
     # same for dev dataset
@@ -221,9 +255,6 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         lambda batch: clean_text_batch(batch, config.character_set, config.apply_accent_replacements),
         batched=True,
         batch_size=64,
-        # disable caching
-        #keep_in_memory=True, 
-        #load_from_cache_file=False,
         num_proc=8,
         desc="Cleaning text transcripts in train split"
     )
@@ -231,22 +262,16 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
         lambda batch: clean_text_batch(batch, config.character_set, config.apply_accent_replacements),
         batched=True,
         batch_size=64,
-        # disable caching
-        #keep_in_memory=True,
-        #load_from_cache_file=False,
         num_proc=8,
         desc="Cleaning text transcripts in validation split"
     )
 
     # add language tokens to the beginning of the transcription
-    if config.add_language_tokens:        
+    if config.add_language_tokens and config.language == "all":        
         train_dataset = train_dataset.map(
             lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
             batch_size=16,
-            # disable caching
-            #keep_in_memory=True,
-            #load_from_cache_file=False,
             num_proc=8,
             desc="Adding language tags to train transcriptions"
         )
@@ -255,9 +280,6 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
             lambda batch: add_language_tag_to_transcript(batch),
             batched=True,
             batch_size=16,
-            # disable caching
-            #keep_in_memory=True,
-            #load_from_cache_file=False,
             num_proc=8,
             desc="Adding language tags to validation transcriptions"
         )

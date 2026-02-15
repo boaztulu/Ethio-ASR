@@ -20,7 +20,8 @@ num_epochs: 25
 max_steps: 1000
 learning_rate: 0.00003 # or 0.0005 for "facebook/mms-300m"  
 warmup_ratio: 0.1
-fp16: true
+fp16: false
+bf16: true
 gradient_checkpointing: true
 save_steps: 100
 eval_steps: 100
@@ -35,7 +36,7 @@ use_custom_dataset: false
 dataset_path: "badrex/waxalNLP-dataset-1k"  
 train_split: "train"
 eval_split: "validation"
-language: "all"
+language: "amh"
 
 # Data sampling settings (for debugging purposes)
 sample: false
@@ -43,7 +44,7 @@ sample_size: 1000
 
 # Text preprocessing settings
 # Character set allowed in transcriptions - customize based on language and script
-add_language_tokens: true
+add_language_tokens: false
 apply_accent_replacements: true
 
 character_set: " !#$%&'*+,-.0123456789=?@abcdefghijklmnopqrstuvwxyzሀሁሂሃሄህሆሇለሉሊላሌልሎሏሐሑሒሓሔሕሖሗመሙሚማሜምሞሟሠሡሢሣሤሥሦሧረሩሪራሬርሮሯሰሱሲሳሴስሶሷሸሹሺሻሼሽሾሿቀቁቂቃቄቅቆቇቈቊቋቌቍቐቑቒቓቔቕቖቘቚቛቜቝበቡቢባቤብቦቧቨቩቪቫቬቭቮቯተቱቲታቴትቶቷቸቹቺቻቼችቾቿኀኁኂኃኄኅኆኇኈኊኋኌኍነኑኒናኔንኖኗኘኙኚኛኜኝኞኟአኡኢኣኤእኦኧከኩኪካኬክኮኯኰኲኳኴኵኸኹኺኻኼኽኾዀዂዃዄዅወዉዊዋዌውዎዏዐዑዒዓዔዕዖዘዙዚዛዜዝዞዟዠዡዢዣዤዥዦዧየዩዪያዬይዮዯደዱዲዳዴድዶዷዸዹዺዻዼዽዾዿጀጁጂጃጄጅጆጇገጉጊጋጌግጎጏጐጒጓጔጕጘጙጚጛጜጝጞጟጠጡጢጣጤጥጦጧጨጩጪጫጬጭጮጯጰጱጲጳጴጵጶጷጸጹጺጻጼጽጾጿፀፁፂፃፄፅፆፇፈፉፊፋፌፍፎፏፐፑፒፓፔፕፖፗፘፙፚ፠፡።፣፤፥፦፧፨፩፪፫፬፭፮፯፰፱፲፳፴፵፶፷፸፹፺፻፼€"
