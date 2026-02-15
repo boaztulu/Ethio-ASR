@@ -24,6 +24,7 @@ class ASRConfig:
     learning_rate: float = 5e-5
     warmup_ratio: float = 0.1
     fp16: bool = True
+    bf16: bool = True
     gradient_checkpointing: bool = True
     save_steps: int = 400
     eval_steps: int = 400

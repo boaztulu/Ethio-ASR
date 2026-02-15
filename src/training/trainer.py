@@ -42,9 +42,10 @@ def create_training_args(config: ASRConfig, experiment_name: str) -> TrainingArg
         #eval_accumulation_steps=1024,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
         dataloader_num_workers=4, 
-        ddp_find_unused_parameters=True, # this is the key parameter for distributed training
+        #ddp_find_unused_parameters=True, # this is the key parameter for distributed training
         #ddp_backend="nccl",
-        fp16=False,  # Enable mixed precision
+        fp16=config.fp16,  # Enable mixed precision
+        bf16=config.bf16,  # Enable bfloat16 precision
         #dataloader_pin_memory=False,
         eval_strategy="steps",
         num_train_epochs=num_train_epochs,  # always a number, never None
@@ -75,6 +76,7 @@ def create_asr_trainer(
     eval_dataset,
     data_collator,
     processor: Wav2Vec2Processor,
+    experiment_name: str, 
     config: ASRConfig
 ) -> Trainer:
     """
@@ -86,14 +88,12 @@ def create_asr_trainer(
         eval_dataset: Evaluation dataset
         data_collator: Data collator for batching
         processor: Wav2Vec2Processor
+        experiment_name: Experiment name
         config: ASR configuration
         
     Returns:
         Configured Trainer object
-    """
-    # Create experiment name
-    experiment_name = config.get_experiment_name()
-    
+    """    
     # Create training arguments
     training_args = create_training_args(config, experiment_name)
 

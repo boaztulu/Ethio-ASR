@@ -49,7 +49,7 @@ def load_datasets(config: ASRConfig) -> Tuple[Dataset, Dataset]:
                              f"when use_custom_dataset is True")
     else:
         # Load dataset from HF hub
-        logging.info(f"Loading training dataset from HF hub from "
+        logging.info(f"Loading dataset from HF hub from "
                      f"{config.dataset_path}...")
         dataset = load_dataset(
             config.dataset_path,
@@ -298,7 +298,7 @@ def build_vocabulary(character_set: set[str],
     # handle special tokens
     # add word delimiter token and remove space token
     vocab_dict["|"] = vocab_dict[" "]
-    print("printing vocab_dict length: ", len(vocab_dict))
+
     del vocab_dict[" "]
 
     # add unknown token and padding token

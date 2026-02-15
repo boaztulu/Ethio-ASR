@@ -14,13 +14,14 @@ freeze_feature_encoder: true
 add_final_layer_adapter: true 
 
 # Training settings
-batch_size: 8
-gradient_accumulation_steps: 4
+batch_size: 4
+gradient_accumulation_steps: 8
 num_epochs: 25
 max_steps: 18400
 learning_rate: 0.00005 # or 0.0005 for "facebook/mms-300m"  
 warmup_ratio: 0.1
-fp16: true
+fp16: false
+bf16: true
 gradient_checkpointing: true
 save_steps: 800
 eval_steps: 800

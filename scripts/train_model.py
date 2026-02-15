@@ -225,11 +225,6 @@ def main():
     # create model
     logging.info(f"Creating model from the pretraiend {config.pretrained_model} model...")
     model = create_asr_model(config, processor)
-
-
-    print(f"pad_token_id: {processor.tokenizer.pad_token_id}")
-    print(f"vocab_size: {len(processor.tokenizer)}")
-    print(f"model blank_id: {model.config.pad_token_id}")
     
     # encode datasets for training with ASRDatasetEncoder
     logging.info("Preparing datasets for training with ASRDatasetEncoder...")
@@ -267,17 +262,18 @@ def main():
         print(f"Sample {i}: max={max(labels)}, min={min(labels)}, len={len(labels)}")
     
     # create and run trainer
-    logging.info("Starting training model for ASR...")
+    logging.info("Creating a Trainer object...")
     trainer = create_asr_trainer(
         model=model,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         data_collator=data_collator,
         processor=processor,
+        experiment_name=experiment_name, 
         config=config
     )
     
-    # train model
+    logging.info("Starting training model for ASR...")
     trainer.train()
     
     # save model and processor
