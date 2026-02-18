@@ -8,6 +8,7 @@ from datasets import disable_caching
 disable_caching()
 
 # for vectorized filtering on large datasets via Arrow
+# NOTE: this did not work for some reason; investigate later
 import pyarrow.compute as pc
 
 

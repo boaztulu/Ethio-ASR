@@ -6,7 +6,7 @@ from transformers import Trainer, TrainingArguments, Wav2Vec2Processor
 import evaluate
 
 from src.utils.config import ASRConfig
-from src.training.metrics import compute_metrics, preprocess_logits_for_metrics
+from src.training.metrics import ASRMetrics, preprocess_logits_for_metrics
 
 
 def create_training_args(config: ASRConfig, experiment_name: str) -> TrainingArguments:
@@ -100,8 +100,16 @@ def create_asr_trainer(
     # Load eval metrics
     # this was moved from /src/training/metrics.py to here 
     # because evaluation loop was too slow 
-    wer_metric = evaluate.load("wer")
-    cer_metric = evaluate.load("cer")
+    #wer_metric = evaluate.load("wer")
+    #cer_metric = evaluate.load("cer")
+
+    # create ASR metrics
+    asr_metrics = ASRMetrics(
+        processor=processor,
+        wer_metric=evaluate.load("wer"),
+        cer_metric=evaluate.load("cer"),
+        output_dir= os.path.join(training_args.output_dir, "predictions_json")
+    )
     
     # Create trainer
     trainer = Trainer(
@@ -111,12 +119,7 @@ def create_asr_trainer(
         eval_dataset=eval_dataset,
         processing_class=processor.feature_extractor,
         data_collator=data_collator,
-        compute_metrics=lambda pred: compute_metrics(
-            pred, 
-            processor, 
-            wer_metric=wer_metric,
-            cer_metric=cer_metric
-        ),
+        compute_metrics=asr_metrics.compute_metrics
     )
     
     return trainer

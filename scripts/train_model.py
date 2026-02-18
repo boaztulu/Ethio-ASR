@@ -255,6 +255,7 @@ def main():
         padding=True
     )
 
+
     # create and run trainer
     logging.info("Creating a Trainer object...")
     trainer = create_asr_trainer(
