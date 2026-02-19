@@ -138,19 +138,34 @@ def create_asr_model(config: ASRConfig,
     # else:
     #     add_final_layer_adapter = False
 
-    model = AutoModelForCTC.from_pretrained(
-        pretrained_model_path,
-        attention_dropout=0.00,
-        hidden_dropout=0.00,
-        feat_proj_dropout=0.00,
-        mask_time_prob=0.00,
-        layerdrop=0.00,
-        ctc_loss_reduction="mean",
-        ctc_zero_infinity=True,
-        add_adapter=getattr(config, "add_final_layer_adapter", False),  
-        pad_token_id=processor.tokenizer.pad_token_id,
-        vocab_size=len(processor.tokenizer),
-    )
+    # check if the pretrained model is a Hubert model
+    if "hubert" in pretrained_model_path.lower():
+        model = AutoModelForCTC.from_pretrained(
+            pretrained_model_path,
+            attention_dropout=0.00,
+            hidden_dropout=0.00,
+            feat_proj_dropout=0.00,
+            mask_time_prob=0.00,
+            layerdrop=0.00,
+            ctc_loss_reduction="mean",
+            ctc_zero_infinity=True,
+            pad_token_id=processor.tokenizer.pad_token_id,
+            vocab_size=len(processor.tokenizer),
+        )
+    else:
+        model = AutoModelForCTC.from_pretrained(
+            pretrained_model_path,
+            attention_dropout=0.00,
+            hidden_dropout=0.00,
+            feat_proj_dropout=0.00,
+            mask_time_prob=0.00,
+            layerdrop=0.00,
+            ctc_loss_reduction="mean",
+            ctc_zero_infinity=True,
+            add_adapter=getattr(config, "add_final_layer_adapter", False),  
+            pad_token_id=processor.tokenizer.pad_token_id,
+            vocab_size=len(processor.tokenizer),
+        )
 
     # apply freezing configuration
     # if model is based on wav2vec2, freeze feature encoder if specified
