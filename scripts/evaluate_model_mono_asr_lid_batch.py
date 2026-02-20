@@ -146,7 +146,7 @@ def evaluate_split(dataset: Dataset,
                    processor: AutoProcessor,
                    device: torch.device,
                    split_name: str,
-                   use_lid: bool,
+                   language: str,
                    batch_size: int = 16,
                    text_column: str = 'transcription') -> Dict[str, Any]:
     """evaluate a dataset split and calculate WER/CER"""
@@ -185,6 +185,10 @@ def evaluate_split(dataset: Dataset,
     logging.info(f"shuffling {split_name} split...")
     eval_dataset = eval_dataset.shuffle(seed=42)
 
+    # filter dataset by language
+    eval_dataset = eval_dataset.filter(lambda x: x['language'] == language)
+    logging.info(f"filtered {split_name} split to {len(eval_dataset)} samples for {language}...")
+
     # batch processing
     for batch_start in tqdm(range(0, len(eval_dataset), batch_size),
                             desc=f"transcribing {split_name} split..."):
@@ -206,7 +210,7 @@ def evaluate_split(dataset: Dataset,
                 ref_text = geez_normalizer.normalize(ref_text)
 
             # override lid if flag is off
-            final_pred_lid = pred_lid if use_lid else '[NO_LID_TOKEN]'
+            final_pred_lid = pred_lid if language else '[NO_LID_TOKEN]'
 
             sample_ids.append(s['id'])
             genders.append(s.get('gender', 'unknown'))
@@ -278,14 +282,14 @@ def evaluate_split(dataset: Dataset,
 
 
 def save_transcriptions(result: Dict, dataset: Dataset, split_name: str,
-                        use_lid: bool, experiment_name: str):
+                        experiment_name: str):
     """save transcriptions and lid predictions to json"""
     id_to_char = {v: k for k, v in lang_mapping_dict.items()}
     output = {}
 
     for i, sample_id in enumerate(result['sample_ids']):
         true_lang = id_to_char[result['true_lid_tokens'][i]]
-        pred_lang = id_to_char[result['pred_lid_tokens'][i]] if use_lid else 'NO_LID_TOKEN'
+        pred_lang = 'NO_LID_TOKEN'
         output[sample_id] = {
             "true_language": true_lang,
             "gender": result['genders'][i],
@@ -294,7 +298,7 @@ def save_transcriptions(result: Dict, dataset: Dataset, split_name: str,
             "pred_transcription": result['predictions'][i],
         }
 
-    out_path = Path(f"json_results/{experiment_name}.json")
+    out_path = Path(f"json_results_monolingual/{experiment_name}.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
@@ -311,13 +315,8 @@ def save_metrics(result: Dict, experiment_name: str):
         'macro_wer': result['macro_wer'],
         'macro_cer': result['macro_cer'],
         'score': result['score'],
-        'lid_accuracy': result['lid_accuracy'],
-        'per_language': {
-            lang: {'wer': m['wer'], 'cer': m['cer'], 'samples': m['samples']}
-            for lang, m in result['per_lang_metrics'].items()
-        }
     }
-    out_path = Path(f"json_results/{experiment_name}.metrics")
+    out_path = Path(f"json_results_monolingual/{experiment_name}.metrics")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(metrics, f, ensure_ascii=False, indent=2)
@@ -329,7 +328,7 @@ def parse_args():
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--dataset_path", type=str, required=True)
     parser.add_argument("--split", type=str, default="test")
-    parser.add_argument("--use_lid", action="store_true", help="enable language id prediction")
+    parser.add_argument("--language", type=str, help="language to evaluate on")
     parser.add_argument("--experiment_name", type=str, required=True)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--text_column", type=str, default="transcription")
@@ -342,12 +341,7 @@ def main():
     logging.info("starting evaluation script...")
 
     logging.info(f"loading dataset from {args.dataset_path}...")
-
-    # try to read from disk if it's a local path, otherwise load from HF hub
-    if os.path.exists(args.dataset_path):
-        dataset = load_from_disk(args.dataset_path)
-    else:
-        dataset = load_dataset(args.dataset_path)
+    dataset = load_from_disk(args.dataset_path)
 
     logging.info("loading trained model...")
     model, processor, device = load_model(args.model_path)
@@ -355,10 +349,10 @@ def main():
 
     result = evaluate_split(
         dataset, model, processor, device,
-        args.split, args.use_lid, args.batch_size, args.text_column
+        args.split, args.language, args.batch_size, args.text_column
     )
 
-    save_transcriptions(result, dataset, args.split, args.use_lid, args.experiment_name)
+    save_transcriptions(result, dataset, args.language, args.experiment_name)
     save_metrics(result, args.experiment_name)
 
     print("\n" + "="*50)
@@ -372,7 +366,6 @@ def main():
         'macro WER (%)': f"{result['macro_wer']*100:.2f}%",
         'macro CER (%)': f"{result['macro_cer']*100:.2f}%",
         'Score (%)': f"{result['score']:.2f}%",
-        'LID Accuracy (%)': f"{result['lid_accuracy']*100:.2f}%",
     }])
     print(summary_df.to_string(index=False))
 
