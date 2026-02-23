@@ -25,11 +25,6 @@ import re
 from typing import Dict, List, Any, Tuple
 import logging
 
-HF_TOKEN = "hf_xxx"
-
-if not HF_TOKEN:
-    raise ValueError("HF_TOKEN is not set")
-
 def load_env_file(env_path: str):
     """load environment variables from .env file"""
     with open(env_path, 'r') as f:
@@ -49,9 +44,10 @@ load_env_file(env_path)
 sys.path.insert(0, str(project_root))
 logging.info(f"Project root added to Python path: {project_root}")
 
-# Ge'ez Normalizer 
-from post_processing.normalization import GeezNormalizer
-geez_normalizer = GeezNormalizer()
+
+# import post-processing functions
+import post_processing.normalization 
+geez_normalizer = post_processing.normalization.GeezNormalizer()
 
 lang_mapping_dict = {
     '[AMH]': 0,
@@ -82,18 +78,6 @@ def extract_lid_token(prediction: str) -> tuple[str, str]:
         lid_token = '[NO_LID_TOKEN]'
         transcript = prediction.strip()
     return lid_token, transcript
-
-
-def process_text(text: str) -> str:
-    """apply text normalization to the input text."""
-    character_set = set(" !#$%&'*+,-.0123456789=?@abcdefghijklmnopqrstuvwxyzሀሁሂሃሄህሆሇለሉሊላሌልሎሏሐሑሒሓሔሕሖሗመሙሚማሜምሞሟሠሡሢሣሤሥሦሧረሩሪራሬርሮሯሰሱሲሳሴስሶሷሸሹሺሻሼሽሾሿቀቁቂቃቄቅቆቇቈቊቋቌቍቐቑቒቓቔቕቖቘቚቛቜቝበቡቢባቤብቦቧቨቩቪቫቬቭቮቯተቱቲታቴትቶቷቸቹቺቻቼችቾቿኀኁኂኃኄኅኆኇኈኊኋኌኍነኑኒናኔንኖኗኘኙኚኛኜኝኞኟአኡኢኣኤእኦኧከኩኪካኬክኮኯኰኲኳኴኵኸኹኺኻኼኽኾዀዂዃዄዅወዉዊዋዌውዎዏዐዑዒዓዔዕዖዘዙዚዛዜዝዞዟዠዡዢዣዤዥዦዧየዩዪያዬይዮዯደዱዲዳዴድዶዷዸዹዺዻዼዽዾዿጀጁጂጃጄጅጆጇገጉጊጋጌግጎጏጐጒጓጔጕጘጙጚጛጜጝጞጟጠጡጢጣጤጥጦጧጨጩጪጫጬጭጮጯጰጱጲጳጴጵጶጷጸጹጺጻጼጽጾጿፀፁፂፃፄፅፆፇፈፉፊፋፌፍፎፏፐፑፒፓፔፕፖፗፘፙፚ፠፡።፣፤፥፦፧፨፩፪፫፬፭፮፯፰፱፲፳፴፵፶፷፸፹፺፻፼€")
-    punctuation_mark = set("!#$%&'()*+,-./:;<=>?@[\\]^_`{|}~፠፡።፣፥፤፦፧፨᎐᎑᎒᎓᎔᎕᎖᎗᎘᎙")
-    allowed_characters = character_set - punctuation_mark
-    text = ''.join(c for c in text if c.lower() in allowed_characters)
-    for punc in punctuation_mark:
-        text = text.replace(punc, ' ')
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text.lower().strip()
 
 
 ModelComponents = Tuple[AutoModelForCTC, AutoProcessor, torch.device]
@@ -128,18 +112,6 @@ def transcribe_batch(audio_arrays: List,
     return [extract_lid_token(t) for t in transcriptions]
 
 
-def debug_tokenizer(processor):
-    """debug tokenizer information"""
-    print("=== TOKENIZER DEBUG ===")
-    print(f"tokenizer type: {type(processor.tokenizer)}")
-    if hasattr(processor.tokenizer, 'vocab_size'):
-        print(f"vocab size: {processor.tokenizer.vocab_size}")
-    if hasattr(processor.tokenizer, 'get_vocab'):
-        vocab = processor.tokenizer.get_vocab()
-        pad_tokens = [k for k, v in vocab.items() if 'pad' in k.lower()]
-        print(f"pad-related tokens: {pad_tokens[:5]}")
-    print("=====================")
-
 
 def evaluate_split(dataset: Dataset,
                    model: AutoModelForCTC,
@@ -168,8 +140,6 @@ def evaluate_split(dataset: Dataset,
 
     print(f"processing {split_name} split. {len(eval_dataset)} samples were found.")
 
-    if split_name == 'validation':
-        debug_tokenizer(processor)
 
     wer_metric = evaluate.load("wer")
     cer_metric = evaluate.load("cer")
@@ -201,8 +171,8 @@ def evaluate_split(dataset: Dataset,
             true_lid = '[' + s['language'].upper() + ']'
 
             
-            pred_text = process_text(pred_transcript)
-            ref_text = process_text(s[text_column])
+            pred_text = post_processing.normalization.process_text(pred_transcript)
+            ref_text = post_processing.normalization.process_text(s[text_column])
 
             # in case Ge'ez script, normalize the prediction and reference
             if true_lid in {'[AMH]', '[TIR]'}:
@@ -298,7 +268,7 @@ def save_transcriptions(result: Dict, dataset: Dataset, split_name: str,
             "pred_transcription": result['predictions'][i],
         }
 
-    out_path = Path(f"json_results_monolingual/{experiment_name}.json")
+    out_path = Path(f"json_outputs_monolingual/{experiment_name}.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
@@ -316,7 +286,7 @@ def save_metrics(result: Dict, experiment_name: str):
         'macro_cer': result['macro_cer'],
         'score': result['score'],
     }
-    out_path = Path(f"json_results_monolingual/{experiment_name}.metrics")
+    out_path = Path(f"json_outputs_monolingual/{experiment_name}.metrics")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(metrics, f, ensure_ascii=False, indent=2)

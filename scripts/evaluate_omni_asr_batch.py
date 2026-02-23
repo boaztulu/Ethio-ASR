@@ -13,13 +13,15 @@ from tqdm import tqdm
 # add parent directory to sys.path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
-from scripts.evaluate_finetuned_model_mutlilingual import process_text
 
 # add project root for geez normalizer
 project_root = os.path.dirname(parent_dir)
 sys.path.insert(0, project_root)
-from post_processing.normalization import GeezNormalizer
-geez_normalizer = GeezNormalizer()
+
+
+import post_processing.normalization 
+geez_normalizer = post_processing.normalization.GeezNormalizer()
+
 
 lang2code = {
     "amh": "amh_Ethi",
@@ -31,13 +33,6 @@ lang2code = {
 
 # languages that use ge'ez script
 geez_langs = {"amh", "tir"}
-
-
-def normalize(text: str, lang: str) -> str:
-    """apply geez normalization for script languages, then process_text for all"""
-    if lang in geez_langs:
-        text = geez_normalizer.normalize(text)
-    return process_text(text)
 
 
 def compute_per_lang_metrics(predictions, references, languages, wer_metric, cer_metric):
@@ -116,22 +111,27 @@ def main():
             lang_arg = [lang2code[lang]] if args.use_lid else None
             raw_pred = pipeline.transcribe([audio], lang=lang_arg, batch_size=args.batch_size)[0]
 
-            pred = normalize(raw_pred, lang)
-            ref = normalize(sample["transcription"], lang)
+            text_pred = post_processing.normalization.process_text(raw_pred)
+            text_ref = post_processing.normalization.process_text(sample["transcription"])
+
+            # normalize the prediction if Ge'ez script
+            if lang in geez_langs:
+                text_pred = geez_normalizer.normalize(raw_pred)
+                text_ref = geez_normalizer.normalize(sample["transcription"])
 
             results[sample.get("id", str(i))] = {
                 "language": lang,
-                "true_transcription": ref,
-                "pred_transcription": pred,
+                "true_transcription": text_ref,
+                "pred_transcription": text_pred,
             }
 
             print(f"sample {i} [{lang}]:")
-            print(f"  prediction: {pred}")
-            print(f"  reference:  {ref}")
+            print(f"  prediction: {text_pred}")
+            print(f"  reference:  {text_ref}")
             print("-" * 75)
 
-            predictions.append(pred)
-            references.append(ref)
+            predictions.append(text_pred)
+            references.append(text_ref)
             languages.append(lang)
 
         # filter empty refs

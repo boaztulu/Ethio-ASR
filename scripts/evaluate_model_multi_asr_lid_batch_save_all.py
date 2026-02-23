@@ -193,7 +193,7 @@ def evaluate_split(dataset: Dataset,
     cer_metric = evaluate.load("cer")
     LID_accuracy_metric = evaluate.load("accuracy")
 
-    predictions, references = [], []
+    raw_predictions, raw_references, predictions, references = [], [], [], []
     true_LID_tokens, pred_LID_tokens = [], []
     sample_ids, genders = [], []
 
@@ -211,11 +211,16 @@ def evaluate_split(dataset: Dataset,
         audio_arrays = [s['audio']['array'] for s in batch]
         results = transcribe_batch(audio_arrays, model, processor, device)
 
-        for s, (pred_LID, pred_transcript) in zip(batch, results):
+        for s, (pred_LID, raw_pred_transcript) in zip(batch, results):
+            
+            raw_predictions.append(raw_pred_transcript)
+            raw_references.append(s[text_column])
+
             true_LID = '[' + s['language'].upper() + ']'
 
-            pred_text = post_processing.normalization.process_text(pred_transcript)
-            ref_text = post_processing.normalization.process_text(s[text_column])
+            pred_text = post_processing.normalization.process_text(raw_pred_transcript)
+            raw_ref_text = s[text_column]
+            ref_text = post_processing.normalization.process_text(raw_ref_text)
 
             # in case Ge'ez script, normalize the prediction and reference
             if true_LID in {'[AMH]', '[TIR]'}:
@@ -239,11 +244,14 @@ def evaluate_split(dataset: Dataset,
     # filter empty refs
     filtered_preds = [p for p, r in zip(predictions, references) if r]
     filtered_refs = [r for r in references if r]
+    filtered_raw_preds = [p for p, r in zip(raw_predictions, raw_references) if r]
+    filtered_raw_refs = [r for r in raw_references if r]
 
     if not filtered_preds:
         print("no valid predictions found!")
         return {'split': split_name, 'wer': 1.0, 'cer': 1.0, 'score': 0.0,
                 'lid_accuracy': 0.0, 'samples': len(eval_dataset),
+                'raw_predictions': raw_predictions, 'raw_references': raw_references,
                 'predictions': predictions, 'references': references,
                 'sample_ids': sample_ids, 'genders': genders,
                 'true_LID_tokens': true_LID_tokens, 'pred_LID_tokens': pred_LID_tokens}
@@ -299,7 +307,8 @@ def evaluate_split(dataset: Dataset,
         'macro_wer': macro_wer, 'macro_cer': macro_cer,
         'per_lang_metrics': per_lang_metrics,
         'lid_accuracy': LID_accuracy['accuracy'], 'samples': len(eval_dataset),
-        'predictions': predictions, 'references': references,
+        'predictions': filtered_preds, 'references': filtered_refs,
+        'raw_predictions': filtered_raw_preds, 'raw_references': filtered_raw_refs,
         'sample_ids': sample_ids, 'genders': genders,
         'true_LID_tokens': true_LID_tokens, 'pred_LID_tokens': pred_LID_tokens
     }
@@ -314,22 +323,24 @@ def save_transcriptions(result: Dict, dataset: Dataset, split_name: str,
     for i, sample_id in enumerate(result['sample_ids']):
         true_lang = id_to_char[result['true_LID_tokens'][i]]
         pred_lang = id_to_char[result['pred_LID_tokens'][i]] if use_lid else 'NO_LID_TOKEN'
-        output[sample_id] = {
+        output[sample_id + '_' + true_lang.lower()] = {
             "true_language": true_lang,
             "gender": result['genders'][i],
             "pred_language": pred_lang,
             "true_transcription": result['references'][i],
             "pred_transcription": result['predictions'][i],
+            "raw_pred_transcription": result['raw_predictions'][i],
+            "raw_ref_transcription": result['raw_references'][i],
         }
 
-    out_path = Path(f"json_outputs/{experiment_name}.json")
+    out_path = Path(f"json_outputs_fleurs/{experiment_name}_{split_name}.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
     logging.info(f"transcriptions saved to {out_path}")
 
 
-def save_metrics(result: Dict, experiment_name: str):
+def save_metrics(result: Dict, experiment_name: str, split_name: str):
     """save evaluation metrics to json next to the transcriptions file"""
     metrics = {
         'split': result['split'],
@@ -345,7 +356,7 @@ def save_metrics(result: Dict, experiment_name: str):
             for lang, m in result['per_lang_metrics'].items()
         }
     }
-    out_path = Path(f"json_outputs/{experiment_name}.metrics")
+    out_path = Path(f"json_outputs_fleurs/{experiment_name}_{split_name}.metrics")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(metrics, f, ensure_ascii=False, indent=2)
@@ -387,7 +398,7 @@ def main():
     )
 
     save_transcriptions(result, dataset, args.split, args.use_lid, args.experiment_name)
-    save_metrics(result, args.experiment_name)
+    save_metrics(result, args.experiment_name, args.split)
 
     print("\n" + "="*50)
     print("EVALUATION SUMMARY")
