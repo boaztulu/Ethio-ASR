@@ -3,6 +3,19 @@
 **Boaz Tulu — University of Florida**
 *June 2026*
 
+## Phase 1 follow-up: 4-voice multilingual TTS
+
+The original question was *intelligibility-efficiency*. A natural follow-up
+is **voice variety** — can we get more than one voice from WAXAL? Yes:
+we built a pipeline that takes `text → MMS-TTS-{lang} → OpenVoice v2 tone
+color converter (target voice)`. Target voices were auto-selected from
+WAXAL speakers using an F0-based age proxy, producing 4 profiles per
+language (young M/F, old M/F) across **Amharic, Tigrinya, Oromo, Sidaama**.
+A live Gradio demo with a voice radio button is in
+`tts_extension/webapp/app.py`; SLURM launcher in
+`tts_extension/webapp/serve_webapp.sbatch`.
+
+
 ## TL;DR
 
 WAXAL Amharic contains **195.8 hours of audio across 452 speakers**, with rich

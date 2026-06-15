@@ -1,0 +1,106 @@
+{
+  "amh": {
+    "old_male": {
+      "speaker_id": "Nr83c8HDyuRRRaskXXkk6e70rCg1",
+      "median_f0_hz": 94.0,
+      "ref_duration_s": 36.85,
+      "path": "amh/old_male/ref.wav"
+    },
+    "young_male": {
+      "speaker_id": "koS2CkyGupZguCk2Jd0HtSTpoyP2",
+      "median_f0_hz": 176.4,
+      "ref_duration_s": 10.89,
+      "path": "amh/young_male/ref.wav"
+    },
+    "old_female": {
+      "speaker_id": "mi7mqaCCfNgMOZWrkAja4M5bIXv1",
+      "median_f0_hz": 79.7,
+      "ref_duration_s": 11.15,
+      "path": "amh/old_female/ref.wav"
+    },
+    "young_female": {
+      "speaker_id": "CSt3fgaN9OQvU12FlMjVBtCwaKo2",
+      "median_f0_hz": 261.2,
+      "ref_duration_s": 34.6,
+      "path": "amh/young_female/ref.wav"
+    }
+  },
+  "tir": {
+    "old_male": {
+      "speaker_id": "VmHD49kwmIO6aZk1nbiIOYbi2LF3",
+      "median_f0_hz": 101.9,
+      "ref_duration_s": 34.79,
+      "path": "tir/old_male/ref.wav"
+    },
+    "young_male": {
+      "speaker_id": "PVQxZee2NiVAbuGqv8efAXOOz9C3",
+      "median_f0_hz": 205.0,
+      "ref_duration_s": 33.56,
+      "path": "tir/young_male/ref.wav"
+    },
+    "old_female": {
+      "speaker_id": "gBG6A7PfYUNr7jbe7xphyHufbaa2",
+      "median_f0_hz": 100.7,
+      "ref_duration_s": 37.24,
+      "path": "tir/old_female/ref.wav"
+    },
+    "young_female": {
+      "speaker_id": "dOG2DbyEvgfDAF75bk6Q7QmsmD62",
+      "median_f0_hz": 283.3,
+      "ref_duration_s": 34.37,
+      "path": "tir/young_female/ref.wav"
+    }
+  },
+  "orm": {
+    "old_male": {
+      "speaker_id": "GQdIWvbcAnMqFzeTI13oQJH5Ry83",
+      "median_f0_hz": 100.7,
+      "ref_duration_s": 34.49,
+      "path": "orm/old_male/ref.wav"
+    },
+    "young_male": {
+      "speaker_id": "Nwen3IIdyASzAPZxpn0vc3XPn6p2",
+      "median_f0_hz": 203.8,
+      "ref_duration_s": 35.17,
+      "path": "orm/young_male/ref.wav"
+    },
+    "old_female": {
+      "speaker_id": "R1NtD3E1QrMbTxQHmJfakzdIIFJ3",
+      "median_f0_hz": 0.0,
+      "ref_duration_s": 4.56,
+      "path": "orm/old_female/ref.wav"
+    },
+    "young_female": {
+      "speaker_id": "oA2FjzrPSlXtoWaVvyARq1WOLWi1",
+      "median_f0_hz": 283.3,
+      "ref_duration_s": 21.73,
+      "path": "orm/young_female/ref.wav"
+    }
+  },
+  "sid": {
+    "old_male": {
+      "speaker_id": "ww9WZCC5YKgwVq9UKd2fkMoQPM02",
+      "median_f0_hz": 177.4,
+      "ref_duration_s": 35.68,
+      "path": "sid/old_male/ref.wav"
+    },
+    "young_male": {
+      "speaker_id": "fpDC2YHnWYQaT6hKdA0xXbjaR253",
+      "median_f0_hz": 253.8,
+      "ref_duration_s": 51.84,
+      "path": "sid/young_male/ref.wav"
+    },
+    "old_female": {
+      "speaker_id": "4p64CQ40BTRQn1BnP16tVDC4kxy1",
+      "median_f0_hz": 137.2,
+      "ref_duration_s": 34.14,
+      "path": "sid/old_female/ref.wav"
+    },
+    "young_female": {
+      "speaker_id": "7YMGdxBVhdRSizyiEZGfO1YMUOJ3",
+      "median_f0_hz": 332.0,
+      "ref_duration_s": 34.24,
+      "path": "sid/young_female/ref.wav"
+    }
+  }
+}

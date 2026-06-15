@@ -20,21 +20,15 @@ module purge
 module load pytorch/2.8.0
 source "$PROJECT_ROOT/slurm_scripts/setup_env.sh"
 
-TTS_MODEL="${TTS_MODEL:-facebook/mms-tts-amh}"
-ASR_MODEL="${ASR_MODEL:-boazsew/Ethio-ASR-w2v-bert-2.0-uf}"
-PORT="${PORT:-7861}"
+PORT="${PORT:-7862}"
 
-echo "=== Ethio-TTS demo ==="
+echo "=== Ethio-TTS demo (multi-language + voice controls) ==="
 echo "Host:  $(hostname)"
 echo "Job:   ${SLURM_JOB_NAME:-?} (${SLURM_JOB_ID:-?})"
-echo "TTS:   $TTS_MODEL"
-echo "ASR:   $ASR_MODEL"
 echo "Port:  $PORT"
 nvidia-smi -L
 
 python3 -u "$PROJECT_ROOT/webapp/app.py" \
-    --tts_model "$TTS_MODEL" \
-    --asr_model "$ASR_MODEL" \
     --port "$PORT" \
     --host 0.0.0.0 \
     --share

@@ -29,3 +29,6 @@ reproduction_uf/webapp/samples/
 *.swp
 .DS_Store
 .gradio/
+tts_extension/reference_voices/**/*.wav
+tts_extension/openvoice_ckpts/
+tts_extension/external/
