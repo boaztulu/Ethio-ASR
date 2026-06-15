@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+
+# Training artefacts that should live outside the repo
+.env
+.env.*
+inprogress/
+logs/
+wandb/
+*.pt
+*.bin
+*.safetensors
+
+# Dataset caches
+.dataset_cache/
+
+# Cached web demo audio (regenerated on first run)
+reproduction_uf/webapp/samples/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
