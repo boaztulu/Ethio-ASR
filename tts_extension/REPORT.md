@@ -15,6 +15,32 @@ A live Gradio demo with a voice radio button is in
 `tts_extension/webapp/app.py`; SLURM launcher in
 `tts_extension/webapp/serve_webapp.sbatch`.
 
+## Phase 2: per-voice MMS-TTS fine-tunes
+
+Sharper voice identity than Phase 1's voice-conversion approach.
+Each of the 4 Amharic voices becomes its own fine-tuned VITS model
+trained on ~200 short clips from one WAXAL speaker.
+
+* **Recipe**: `ylacombe/finetune-hf-vits`, 200 epochs, LR 2e-5, bf16,
+  effective batch 16, B200 GPU.
+* **Speakers**: same Phase-1 reference voices (young M/F + old M/F)
+  except old_male was re-picked to a speaker (F0 91.8 Hz) that has
+  more <20 s clips than the original.
+* **Datasets** pushed to HF Hub as private:
+  `boazsew/waxal-amh-{young,old}_{male,female}` (200-225 train, 20-25 val).
+* **Training wall**: 5-14 min per voice on B200.
+* **Resulting models** live at
+  `tts_extension/configs/phase2/{young,old}_{male,female}.json` and the
+  trained weights under `/blue/.../Ethio-TTS/models/phase2/amh_*/`.
+* **A/B in the demo**: `tts_extension/webapp/combined_app.py` adds an
+  "Engine" radio so users can synthesize the same text/voice with both
+  Phase 1 (OpenVoice) and Phase 2 (fine-tuned VITS) back-to-back.
+
+The combined demo (`combined_app.py`) bundles all features into a single
+Gradio app: 4-language × 4-voice TTS (with Phase 1/2 A/B), plus three
+ASR tabs (preloaded sample / file upload / microphone) using our
+reproduced `boazsew/Ethio-ASR-w2v-bert-2.0-uf` model.
+
 
 ## TL;DR
 

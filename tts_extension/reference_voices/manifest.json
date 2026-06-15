@@ -1,10 +1,11 @@
 {
   "amh": {
     "old_male": {
-      "speaker_id": "Nr83c8HDyuRRRaskXXkk6e70rCg1",
-      "median_f0_hz": 94.0,
-      "ref_duration_s": 36.85,
-      "path": "amh/old_male/ref.wav"
+      "speaker_id": "woHWc1V52DTUpKYI9Dlp6oMjl7G3",
+      "median_f0_hz": 91.8,
+      "ref_duration_s": 37.69,
+      "path": "amh/old_male/ref.wav",
+      "note": "re-picked for Phase 2 (more usable <20s clips)"
     },
     "young_male": {
       "speaker_id": "koS2CkyGupZguCk2Jd0HtSTpoyP2",

@@ -50,6 +50,8 @@ ANCHOR = {
 }
 
 
+PHASE2_DIR = PR / "models" / "phase2"
+
 class VoicePipeline:
     def __init__(self, device: str = None):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -59,6 +61,38 @@ class VoicePipeline:
         self.tcc = load_converter(device=self.device)
         self.target_ses = {}             # (lang, profile) -> tgt_se Tensor
         self.source_ses = {}             # lang -> src_se Tensor
+        self.phase2_models = {}          # (lang, profile) -> (VitsModel, tokenizer)
+
+    # ---------- Phase 2 (fine-tuned VITS) ----------
+    def _get_phase2(self, lang: str, profile: str):
+        """Return (VitsModel, tokenizer) for a fine-tuned voice, or None if
+        no Phase-2 model exists for this (lang, profile)."""
+        key = (lang, profile)
+        if key in self.phase2_models:
+            return self.phase2_models[key]
+        cand = PHASE2_DIR / f"{lang}_{profile}"
+        if not (cand / "model.safetensors").exists():
+            return None
+        print(f"[pipeline] loading Phase 2 model {cand.name}", flush=True)
+        m = VitsModel.from_pretrained(str(cand)).to(self.device).eval()
+        t = AutoTokenizer.from_pretrained(str(cand))
+        self.phase2_models[key] = (m, t)
+        return (m, t)
+
+    def synthesize_phase2(self, geez_text: str, lang: str, profile: str):
+        """Direct fine-tuned VITS synthesis (no OpenVoice). Returns
+        (wav, sr, romanized_text) or None if no Phase-2 model exists."""
+        pair = self._get_phase2(lang, profile)
+        if pair is None:
+            return None
+        m, tok = pair
+        rom = self.uroman.romanize_string(geez_text.strip())
+        inputs = tok(rom, return_tensors="pt").to(self.device)
+        with torch.no_grad():
+            wav = m(**inputs).waveform
+        return (wav.cpu().squeeze().float().numpy(),
+                m.config.sampling_rate,
+                rom)
 
     # ---------- TTS model lazy-load ----------
     def _get_tts(self, lang: str):
