@@ -66,7 +66,12 @@ def load_model(model_dir: str):
 
 
 def cache_validation_samples(out_dir: Path, per_lang: int = 1) -> list[dict]:
-    """Cache one validation sample per language as .wav files for the demo."""
+    """Cache one validation sample per language as .wav files for the demo.
+
+    Strategy: read the `language` and `audio_duration` columns first
+    (no audio decode), select per-language indices, then materialise
+    only those rows. ~100x faster than iterating the whole dataset.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest_file = out_dir / "manifest.json"
     if manifest_file.exists():
@@ -80,34 +85,44 @@ def cache_validation_samples(out_dir: Path, per_lang: int = 1) -> list[dict]:
 
     ds = load_dataset("badrex/waxalNLP-ethiopic-final", split="validation",
                       verification_mode="no_checks")
-    ds = ds.cast_column("audio", Audio(sampling_rate=16000))
 
+    # Get language + duration as plain lists (no audio decode)
+    langs = ds["language"]
+    durs = ds["audio_duration"] if "audio_duration" in ds.column_names else [None] * len(ds)
+
+    chosen_indices = []
+    chosen_meta = []
     seen = {code: 0 for code in LANG_CODE_TO_NAME}
-    manifest = []
-    for ex in ds:
-        lang = ex.get("language", "").lower()
+    for i, (lang, dur) in enumerate(zip(langs, durs)):
+        lang = (lang or "").lower()
         if lang not in seen or seen[lang] >= per_lang:
             continue
-        if not ex.get("transcription"):
+        # WAXAL validation has WIDE duration ranges per language
+        # (Amharic samples are all 10-30s for example).  Accept up to 25s.
+        if dur is not None and (dur < 1.5 or dur > 25.0):
             continue
-        # Skip too long/short
-        sr = ex["audio"]["sampling_rate"]
-        dur = len(ex["audio"]["array"]) / sr
-        if dur < 1.5 or dur > 10.0:
-            continue
-        idx = seen[lang]
+        chosen_indices.append(i)
+        chosen_meta.append((lang, dur, seen[lang]))
+        seen[lang] += 1
+        if all(v >= per_lang for v in seen.values()):
+            break
+
+    # Materialise only the chosen rows
+    print(f"[app] materialising {len(chosen_indices)} rows", flush=True)
+    sub = ds.select(chosen_indices).cast_column("audio", Audio(sampling_rate=16000))
+
+    manifest = []
+    for j, ex in enumerate(sub):
+        lang, dur, idx = chosen_meta[j]
         path = out_dir / f"{lang}_{idx:02d}.wav"
-        sf.write(str(path), ex["audio"]["array"], sr)
+        sf.write(str(path), ex["audio"]["array"], ex["audio"]["sampling_rate"])
         manifest.append({
             "language_code": lang,
             "language_name": LANG_CODE_TO_NAME[lang],
             "filename": path.name,
-            "duration": round(dur, 2),
-            "reference_transcription": ex["transcription"],
+            "duration": round(dur if dur else len(ex["audio"]["array"])/ex["audio"]["sampling_rate"], 2),
+            "reference_transcription": ex.get("transcription", ""),
         })
-        seen[lang] += 1
-        if all(v >= per_lang for v in seen.values()):
-            break
 
     manifest_file.write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
     print(f"[app] cached {len(manifest)} samples", flush=True)

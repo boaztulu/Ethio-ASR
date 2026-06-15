@@ -50,4 +50,5 @@ nvidia-smi -L
 python3 -u "$PROJECT_ROOT/Ethio-ASR/reproduction_uf/webapp/app.py" \
     --model_dir "$MODEL_DIR" \
     --port "$PORT" \
-    --host 0.0.0.0
+    --host 0.0.0.0 \
+    --share
