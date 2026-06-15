@@ -1,0 +1,71 @@
+{
+  "n_speakers": 452,
+  "total_hours": 195.8,
+  "min_speaker_minutes_threshold": 3.0,
+  "duration_filter_seconds": [
+    1.0,
+    25.0
+  ],
+  "top_15_speakers": [
+    {
+      "speaker": "0X7qLi3huTXHriei0cccyHQSfAc2",
+      "minutes": 111.1
+    },
+    {
+      "speaker": "r0dR5PAuQHd6X1UBSgTz4tgHmRw1",
+      "minutes": 97.43
+    },
+    {
+      "speaker": "Ta6A5w85mYfzx0VOSTtxByPMAtA3",
+      "minutes": 96.09
+    },
+    {
+      "speaker": "14sMuQbKbPPSxjqHYAFCM9iS3Gm2",
+      "minutes": 94.29
+    },
+    {
+      "speaker": "7LC43bWHxvMZDaXvKvaOqV0lUEP2",
+      "minutes": 93.67
+    },
+    {
+      "speaker": "eT9DcAKHUuXNGLyFZhC6TEfKpDB3",
+      "minutes": 93.57
+    },
+    {
+      "speaker": "XzRZy9raBtOh9mRxzWuMd6AJocw2",
+      "minutes": 93.01
+    },
+    {
+      "speaker": "n2TocqCW9WN6G9Sxi9nLaU92UL62",
+      "minutes": 92.79
+    },
+    {
+      "speaker": "rVIFR7J0ZlcebXVxqA5qsI4bKLh2",
+      "minutes": 92.38
+    },
+    {
+      "speaker": "j2Zt4sytOAdbjRJ5bgvys6aITN82",
+      "minutes": 92.26
+    },
+    {
+      "speaker": "yDW8aMTNTegJcMeCrQaLWXhz4RU2",
+      "minutes": 92.19
+    },
+    {
+      "speaker": "rPJRa6fo6Ua9jeomSBrOSLiICuV2",
+      "minutes": 92.16
+    },
+    {
+      "speaker": "ST5J0E4pRPUhjKlei2Wqxnmwer13",
+      "minutes": 91.95
+    },
+    {
+      "speaker": "koS2CkyGupZguCk2Jd0HtSTpoyP2",
+      "minutes": 91.3
+    },
+    {
+      "speaker": "pWjnbB6MF6SVWC59IC6Zc5Y3jA03",
+      "minutes": 91.14
+    }
+  ]
+}

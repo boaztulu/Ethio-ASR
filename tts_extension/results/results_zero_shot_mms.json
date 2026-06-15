@@ -1,0 +1,9 @@
+{
+  "tts_model": "facebook/mms-tts-amh",
+  "asr_model": "boazsew/Ethio-ASR-w2v-bert-2.0-uf",
+  "n_samples": 15,
+  "round_trip_wer": 0.24025974025974026,
+  "round_trip_cer": 0.06831395348837209,
+  "mean_synth_duration_s": 12.451200000000002,
+  "total_synth_duration_s": 186.76800000000003
+}

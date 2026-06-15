@@ -28,3 +28,4 @@ reproduction_uf/webapp/samples/
 .idea/
 *.swp
 .DS_Store
+.gradio/

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+hf_cache/
+filtered_audio/
+tmp_cache/
+logs/
+models/
+webapp_cache/
+*.wav
+*.safetensors
+*.bin

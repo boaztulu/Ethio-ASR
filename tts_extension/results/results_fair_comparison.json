@@ -1,0 +1,20 @@
+{
+  "tts_model": "facebook/mms-tts-amh",
+  "asr_model": "boazsew/Ethio-ASR-w2v-bert-2.0-uf",
+  "n_samples": 300,
+  "duration_filter_s": [
+    2.0,
+    25.0
+  ],
+  "real_audio": {
+    "wer": 0.2091798344620015,
+    "cer": 0.07263658327488115,
+    "mean_dur_s": 17.23392
+  },
+  "synth_audio": {
+    "wer": 0.21595184349134688,
+    "cer": 0.05837424986361157,
+    "mean_dur_s": 17.716693333333332
+  },
+  "intelligibility_gap_wer": 0.006772009029345383
+}
