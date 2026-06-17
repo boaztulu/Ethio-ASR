@@ -329,11 +329,6 @@ def build_ui(pipeline, asr, samples_dir, samples):
             m_pp = gr.Textbox(label="Post-processed prediction", interactive=False, lines=2)
             mic_btn.click(asr_mic, mic_audio, [m_lang, m_raw, m_pp, m_dur])
 
-        gr.Markdown(
-            "Reproduction repos: "
-            "<https://github.com/boaztulu/Ethio-ASR> · "
-            "Models on <https://huggingface.co/boazsew>"
-        )
     return demo
 
 
